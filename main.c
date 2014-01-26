@@ -7,6 +7,10 @@
 #include <linux/kernel.h>
 
 #include "module.h"
+#include "debugfs.h"
+#include "embus.h"
+
+// #define XILBUS   0x0C000000L
 
 
 /* Module parameters */
@@ -26,6 +30,8 @@ static void em5_cleanup(void)
  * have not been initialized.
  */
 {
+	em5_debugfs_free();
+	em5_embus_free();
 	return;
 }
 	
@@ -34,13 +40,11 @@ static int __init em5_init(void)
 	int err = 0;
 	
 	// init components one by one unless first error.
-	(err = false) ||
-	(err = false) || 
-	(err = false) ||
-	(err = 0); //ok
-	
-	if( err)
-	{
+	if(
+		(err = em5_debugfs_init() ) || 
+		(err = em5_embus_init() ) || 
+		(err = 0) //ok
+	){
 		pr_err( MODULE_NAME " registration failed. Rolling back...\n");
 		em5_cleanup();
 		return err;
