@@ -9,8 +9,7 @@
 #include "module.h"
 #include "debugfs.h"
 #include "embus.h"
-
-// #define XILBUS   0x0C000000L
+#include "irq.h"
 
 
 /* Module parameters */
@@ -22,15 +21,21 @@ static uint param_buf_pages = 12800; // 12800 pages = 50 MB
 module_param_named( buf_pages, param_buf_pages, uint, S_IRUGO);
 MODULE_PARM_DESC( buf_pages, "readout buffer size (in pages).");
 	
-	
+uint param_irq_delay = 100;
+module_param_named( irq_delay, param_irq_delay, uint, S_IRUGO);
+MODULE_PARM_DESC( irq_delay, "readout buffer size (in pages).");
+
 static void em5_cleanup(void)
 /*
  * The cleanup function is used to handle initialization failures as well.
- * Thefore, it must be careful to work correctly even if something
+ * Make shure it's working correctly even if something
  * have not been initialized.
  */
 {
+	// order of freeing is important!
+	//em5_charfile_free(); 
 	em5_debugfs_free();
+	em5_irq_free();
 	em5_embus_free();
 	return;
 }
@@ -41,8 +46,11 @@ static int __init em5_init(void)
 	
 	// init components one by one unless first error.
 	if(
-		(err = em5_debugfs_init() ) || 
+		// order is important!
 		(err = em5_embus_init() ) || 
+		(err = em5_irq_init() ) ||
+		(err = em5_debugfs_init() ) || 
+	//	(err = em5_charfile_init( param_major, 0 /*minor*/ ) ) ||
 		(err = 0) //ok
 	){
 		pr_err( MODULE_NAME " registration failed. Rolling back...\n");
@@ -51,7 +59,8 @@ static int __init em5_init(void)
 	}
 	
 	pr_info( MODULE_NAME " has been loaded.\n" );
-	return 0;
+	pr_info( " irq_delay is %d", param_irq_delay);
+	return err;
 }
 
 static void __exit em5_exit(void)
