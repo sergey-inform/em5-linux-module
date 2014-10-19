@@ -1,0 +1,90 @@
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+
+#include <linux/dma-mapping.h>
+#include <linux/device.h>
+#include <linux/wait.h> /*wait..interruptable*/
+
+#include "module.h"
+#include "dma.h"
+
+#include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 28)
+#include <mach/dma.h>
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+#include <asm/dma.h>
+#include <mach/pxa-regs.h>
+#endif
+
+/* The maximum transfer length is 8k - 1 bytes for each DMA descriptor */
+
+int dma_chan = -1; /* auto assing */
+struct device * dev = NULL; // We don't use Centralized Driver Model, so just set it to null.
+ 
+struct dma_transfer {
+	struct pxa_dma_desc * desc_list; /* a list of dma descriptors for Descriptor-Fetch Transfer */
+	size_t desc_len;
+	dma_addr_t hw_desc_list; /* phys address of descriptor chain head */
+	dma_addr_t hw_addr; /* phys address of data source */
+	
+} transfer;
+
+static void dma_irq_handler( int channel, void *data)
+{
+	return;
+}
+
+int em5_dma_init( struct em5_buf * buf)
+{
+	int i = 0;
+	u32 dcmd = 0; /* command register value */
+	
+	dma_chan = pxa_request_dma( MODULE_NAME, DMA_PRIO_HIGH,
+		       	dma_irq_handler, NULL /* void* data */);
+	if (dma_chan < 0) {
+		PERROR("Can't get DMA with PRIO_HIGH.");
+		return -EBUSY;
+	}
+	PDEBUG("Got DMA channel %d.", dma_chan);
+	
+	DRCMR(74) = DRCMR_MAPVLD | (dma_chan & DRCMR_CHLNUM); //map dreq2 to selected channel
+	
+	transfer.desc_len = buf->num_pages * sizeof(*transfer.desc_list);
+	transfer.desc_list = dma_alloc_coherent(dev, transfer.desc_len, &transfer.hw_desc_list, GFP_KERNEL);
+	if (transfer.desc_list == NULL) {
+		PERROR("Can't allocate dma descriptor list, size=%d", transfer.desc_len);
+		return -ENOMEM;
+	}
+	
+	// set hw_addr!
+	//transfer.hw_addr = x...
+	
+	dcmd  |= DCMD_BURST32 | DCMD_WIDTH1; 
+	
+	/* build descriptor list */
+	for (i = 0; i < (buf->num_pages); i++) {
+		transfer.desc_list[i].dsadr = transfer.hw_addr;
+		transfer.desc_list[i].dtadr = dma_map_page(dev, buf->pages[i], 0 /*offset*/,
+				PAGE_SIZE, DMA_FROM_DEVICE);
+		transfer.desc_list[i].ddadr = transfer.hw_desc_list +
+				(i + 1) * sizeof(struct pxa_dma_desc);
+		transfer.desc_list[i].dcmd  = dcmd | PAGE_SIZE;
+	}
+	wmb();
+	
+	return 0;
+}
+
+void em5_dma_free( void)
+{
+	if (transfer.desc_list) {
+		dma_free_coherent(dev, transfer.desc_len, transfer.desc_list, transfer.hw_desc_list);
+	}
+
+	if (dma_chan >= 0) {
+		pxa_free_dma(dma_chan);
+	}
+	
+	return;
+}
