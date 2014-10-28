@@ -91,7 +91,7 @@ int em5_dma_init( struct em5_buf * buf)
 	
 	transfer.hw_addr = XLREG_DATA_HW;
 	dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
-	dcmd |=  DCMD_WIDTH4; //DCMD_BURST32
+	dcmd |=  DCMD_WIDTH4 | DCMD_BURST32;
 	
 	/* build descriptor list */
 	for (i = 0; i < (buf->num_pages); i++) {
