@@ -6,7 +6,7 @@ void em5_debugfs_free(void);
 static inline
 int em5_debugfs_init(void)
 {
-	pr_info( MODULE_NAME " was built without debugfs support.");
+	pr_info( MODULE_NAME " had been built without debugfs support.");
 	return 0;
 }
 

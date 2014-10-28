@@ -2,16 +2,20 @@
 #define XLBASE_LEN	0x10000
 
 extern ulong xlbase; // it's ioremapped in em5_embus_init
-#define XLREG(reg)	(u32 *)(xlbase + reg)
+extern ulong xlbase_hw; 
 
-#define XLREG_DATA 	XLREG(0x0)		// 4-byte data register
-#define XLREG_PCHI 	XLREG(0x4)		// write 1 to start pchi 
-#define XLREG_PCHN 	XLREG(0x8)		// write 1 to start pchn
-#define XLREG_STAT 	XLREG(0x10)		// stat register
-#define XLREG_IFR  	XLREG(0x14)		// IFR interrupt flag register (rw)
-#define XLREG_CTRL 	XLREG(0x18)		// control_register (rw)
-#define XLREG_APWR 	XLREG(0x20)		// start AP write
-#define XLREG_APRD 	XLREG(0x30)		// start AP read
+#define _XLREG(reg)	(u32 *)(xlbase + reg)
+
+#define XLREG_DATA 	_XLREG(0x0)		// 4-byte data register
+#define XLREG_DATA_HW	(u32)(xlbase_hw + 0x0)
+
+#define XLREG_PCHI 	_XLREG(0x4)		// write 1 to start pchi 
+#define XLREG_PCHN 	_XLREG(0x8)		// write 1 to start pchn
+#define XLREG_STAT 	_XLREG(0x10)		// stat register
+#define XLREG_IFR  	_XLREG(0x14)		// IFR interrupt flag register (rw)
+#define XLREG_CTRL 	_XLREG(0x18)		// control_register (rw)
+#define XLREG_APWR 	_XLREG(0x20)		// start AP write
+#define XLREG_APRD 	_XLREG(0x30)		// start AP read
 
 
 

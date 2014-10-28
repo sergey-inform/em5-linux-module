@@ -12,7 +12,7 @@
 
 #include "mach/irqs.h" /* IRQ_GPIO1 */
 	
-static int irq = 0;
+static int hasirq = 0;
 void *callback_id;
 	
 extern ulong xlbase; /* we use it as dev_id (a cookie for callbacks)
@@ -22,20 +22,20 @@ extern uint param_irq_delay;
 
 DECLARE_WAIT_QUEUE_HEAD(short_queue);
 
-irqreturn_t our_irq_handler(int a, void * v)
+irqreturn_t our_irq_handler(int irq, void * dev_id)
 {
-	unsigned int flags1, flags2;
-	int d;
-	
-	flags1 = *XLREG_IFR;
+	//~ unsigned int flags1, flags2;
+	//~ int d;
+	//~ 
+	//~ flags1 = *XLREG_IFR;
 	//~ udelay(param_irq_delay);
-	rmb();
-	*XLREG_IFR = flags1; 
-	wmb();
+	//~ rmb();
+	//~ *XLREG_IFR = flags1; 
+	//~ wmb();
 	//~ udelay(param_irq_delay); 
-	flags2 = *XLREG_IFR;
-	
-	pr_info("!%x ~~~> %x \n", flags1,flags2);
+	//~ flags2 = *XLREG_IFR;
+	//~ 
+	//~ pr_info("!%x ~~~> %x \n", flags1,flags2);
 
 	return IRQ_HANDLED;
 }
@@ -50,22 +50,23 @@ int em5_irq_init()
 		IRQF_PROBE_SHARED /* dev_id must be unique */ ,
 		MODULE_NAME,
 		callback_id /*dev_id*/);
-		
+	
+	PDEBUG("Got IRQ.");
+	
 	if (err) {
 		return err;
 	}
 	
 	irq_set_irq_type(IRQ_GPIO1, IRQ_TYPE_EDGE_FALLING);
-	irq = 1;
+	hasirq = 1;
 	
-	// TODO: enable interrupts generation in xilinx
 	return 0;
 }
 	
 	
 void em5_irq_free()
 {
-	if (irq) {
+	if (hasirq) {
 		free_irq( IRQ_GPIO1, callback_id);
 	}
 	return;

@@ -1,0 +1,15 @@
+1) IOCTL, MMAP
+
+2) client app for mmapping memory and makind emdump.
+
+3) debug dma read/write
+
+
+* add module parameter "debug"
+
+http://cliparser.sourceforge.net/
+https://github.com/dparrish/libcli
+http://clish.sourceforge.net/clish-0.7.3/index.html
+
+
+firmware: http://www.crashcourse.ca/wiki/index.php/Loading_external_firmware

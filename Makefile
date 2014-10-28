@@ -28,7 +28,7 @@ ccflags-$(DEBUG) += $(DEBFLAGS)
 # kernel build system and can use its language.
 ifneq ($(KERNELRELEASE),)
 	obj-m += $(TARGET).o
-	$(TARGET)-objs := main.o buf.o embus.o irq.o # charfile.o #counters.o
+	$(TARGET)-objs := main.o buf.o embus.o irq.o charfile.o device.o em5.o
 	$(TARGET)-$(CONFIG_DEBUG_FS) += debugfs.o
 	$(TARGET)-$(CONFIG_HAS_DMA) += dma-pxa270.o
 	

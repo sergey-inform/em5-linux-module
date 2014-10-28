@@ -8,6 +8,7 @@
 
 #include "module.h"
 #include "dma.h"
+#include "xlregs.h"
 
 #include <linux/version.h>
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 28)
@@ -35,6 +36,36 @@ static void dma_irq_handler( int channel, void *data)
 	return;
 }
 
+int em5_dma_stop(void)
+{
+	//~ u32 ctrl = *XLREG_CTRL;
+	*XLREG_CTRL &= ~DMA_ENA; //unset bit
+	
+	if(dma_chan!=-1) {
+		wmb();
+		DCSR(dma_chan) &= ~DCSR_RUN; //unset bit
+	}
+	
+	return 0;
+}
+
+int em5_dma_start(void)
+{
+	//~ u32 ctrl = XLREG_CTRL;
+	DDADR(dma_chan) = transfer.hw_desc_list;
+	*XLREG_CTRL |= DMA_ENA;
+	
+	
+	if(dma_chan!=-1) {
+		wmb();
+		DCSR(dma_chan) |= DCSR_RUN;
+	}
+	
+	return 0;
+}
+
+
+
 int em5_dma_init( struct em5_buf * buf)
 {
 	int i = 0;
@@ -48,7 +79,8 @@ int em5_dma_init( struct em5_buf * buf)
 	}
 	PDEBUG("Got DMA channel %d.", dma_chan);
 	
-	DRCMR(74) = DRCMR_MAPVLD | (dma_chan & DRCMR_CHLNUM); //map dreq2 to selected channel
+	DRCMR(74) = DRCMR_MAPVLD | (dma_chan & DRCMR_CHLNUM); //map DREQ<2> to selected channel
+	
 	
 	transfer.desc_len = buf->num_pages * sizeof(*transfer.desc_list);
 	transfer.desc_list = dma_alloc_coherent(dev, transfer.desc_len, &transfer.hw_desc_list, GFP_KERNEL);
@@ -57,10 +89,9 @@ int em5_dma_init( struct em5_buf * buf)
 		return -ENOMEM;
 	}
 	
-	// set hw_addr!
-	//transfer.hw_addr = x...
-	
-	dcmd  |= DCMD_BURST32 | DCMD_WIDTH1; 
+	transfer.hw_addr = XLREG_DATA_HW;
+	dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+	dcmd |=  DCMD_WIDTH4; //DCMD_BURST32
 	
 	/* build descriptor list */
 	for (i = 0; i < (buf->num_pages); i++) {
@@ -71,10 +102,19 @@ int em5_dma_init( struct em5_buf * buf)
 				(i + 1) * sizeof(struct pxa_dma_desc);
 		transfer.desc_list[i].dcmd  = dcmd | PAGE_SIZE;
 	}
+	transfer.desc_list[buf->num_pages - 1].ddadr = DDADR_STOP;
 	wmb();
+	DSADR(dma_chan) = transfer.hw_addr;
+	DDADR(dma_chan) = transfer.hw_desc_list;
+	wmb();
+	
+	PDEBUG("DMA src addr: %x", transfer.hw_addr);
+	PDEBUG("DMA dest addr: %x", transfer.hw_desc_list);
 	
 	return 0;
 }
+
+
 
 void em5_dma_free( void)
 {

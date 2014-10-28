@@ -6,22 +6,39 @@
 #include <linux/io.h>	   /* ioremap, iounmap */
 #include <linux/mutex.h>
 
-#include "embus.h"
 #include "module.h"
+#include "em5.h"
+#include "embus.h"
 #include "xlregs.h"
 
 ulong xlbase = 0;
-static ulong xlbase_hw = 0;
+ulong xlbase_hw = 0;
+
+int embus_do(em5_cmd cmd, void* kaddr, size_t sz) {
+	
+	//check_size
+	
+	switch (cmd)
+	{
+	case EM5_TEST:
+		//~ pr_warn("em5-ioctl-test: %ld", (long)word);
+		pr_warn("em5-ioctl-test.\n");
+		break;
+	
+	case EM5_CMD_MAXNR:
+		break; /*to suppress compilation warning*/
+	}
+	return 0;
+}
+
 
 int __init em5_embus_init() 
 {
-	/* Request a memory region... */
 	if ( !request_mem_region( XLBASE, XLBASE_LEN, MODULE_NAME) ) {
 		pr_err( "can't get I/O mem address 0x%lx", XLBASE);
 		return -ENODEV;
 	}
 	
-	/* ... and ioremap it. */
 	xlbase_hw = XLBASE;
 	xlbase = (unsigned long )ioremap_nocache( xlbase_hw, XLBASE_LEN);
 	
