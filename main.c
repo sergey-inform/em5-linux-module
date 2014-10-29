@@ -29,6 +29,8 @@ uint param_irq_delay = 100;
 module_param_named( irq_delay, param_irq_delay, uint, S_IRUGO);
 MODULE_PARM_DESC( irq_delay, "");
 
+//~ #undef DEBUG 
+
 struct em5_buf buf = {};
 
 static void em5_cleanup(void)

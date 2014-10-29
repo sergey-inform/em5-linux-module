@@ -17,7 +17,7 @@ KERNELDIR ?= /lib/modules/`uname -r`/build
 MAKEARCH := $(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE)
 
 ifeq ($(DEBUG),y)
-  DEBFLAGS = -O -g -DEM5_DEBUG # "-O" is needed to expand inlines
+  DEBFLAGS = -O -g -DEM5_DEBUG -DDEBUG # "-O" is needed to expand inlines
 else
   DEBFLAGS = -O2
 endif

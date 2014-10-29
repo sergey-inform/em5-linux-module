@@ -11,9 +11,35 @@
 #include "module.h"
 #include "buf.h"
 
-/**
-	No need to use general dma interface since we are writing code for specific dma-controller.
-*/
+extern struct em5_buf buf;
+
+int em5_buf_mmap( struct vm_area_struct *vma)
+/* Map the buffer to userspace */
+{
+	int ret;
+	unsigned long usize = vma->vm_end - vma->vm_start;
+	unsigned long bufsize = buf.size;
+	
+	/* do not allow larger mapping then the number of pages allocated */
+	if (usize > bufsize) {
+		PERROR("You are trying to map larger area.");
+		return -EIO;
+	}
+	
+	/* make it foolproof */
+	if ( usize != bufsize ){
+		PERROR("You can'y mmap a part of whole buffer.");
+		return -EINVAL;
+	}
+	
+	/* Note: remap_vmalloc_range sets VM_RESERVED flag in vma,
+	   so pages does not migrate in memory after that.
+	*/
+	ret = remap_vmalloc_range( vma, buf.vaddr, 0 /* page offset */ );
+	
+	return ret;
+}
+
 
 int em5_buf_init(struct em5_buf *buf, size_t size)
 /** allocate readout buffer */
@@ -41,7 +67,7 @@ int em5_buf_init(struct em5_buf *buf, size_t size)
 		}
 	}
 	
-	PDEBUG( "%s: Allocated buffer of %d pages.", __func__, buf->num_pages);
+	PDEVEL( "%s: Allocated buffer of %d pages.", __func__, buf->num_pages);
 	if (!buf->vaddr)
 		buf->vaddr = vm_map_ram(buf->pages, buf->num_pages, -1 /*node*/, PAGE_KERNEL);
 	

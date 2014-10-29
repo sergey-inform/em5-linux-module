@@ -14,3 +14,5 @@
 #define PWARNING(format, args...) printk(KERN_WARNING MODULE_NAME": " format "\n"  , ##args) //pr_warn 
 #define PERROR(format, args...)  printk(KERN_ERR MODULE_NAME": " format "\n"  , ##args) //pr_err
 
+
+#define PDEVEL(format, args...) pr_devel(MODULE_NAME": " format "\n"  , ##args) /*prints only when DEBUG flag is set */

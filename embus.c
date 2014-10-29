@@ -35,7 +35,7 @@ int embus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 int __init em5_embus_init() 
 {
 	if ( !request_mem_region( XLBASE, XLBASE_LEN, MODULE_NAME) ) {
-		pr_err( "can't get I/O mem address 0x%lx", XLBASE);
+		pr_err( "can't get I/O mem address 0x%lx!", XLBASE);
 		return -ENODEV;
 	}
 	
@@ -43,11 +43,11 @@ int __init em5_embus_init()
 	xlbase = (unsigned long )ioremap_nocache( xlbase_hw, XLBASE_LEN);
 	
 	if ( !xlbase) {
-		pr_err( "%lx ioremap failed", xlbase_hw);
+		pr_err( "%lx ioremap failed!", xlbase_hw);
 		return -ENOMEM;
 	}
 	
-	pr_info("xlbase ioremapped %lx->%lx", xlbase_hw, xlbase);
+	PDEBUG("xlbase ioremapped %lx->%lx", xlbase_hw, xlbase);
 	
 	return 0;
 }

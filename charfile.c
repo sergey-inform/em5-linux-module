@@ -9,12 +9,13 @@
 
 #include "module.h"
 #include "charfile.h"
+#include "buf.h"
 #include "em5.h"
 #include "embus.h"
 
 static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};
-
+extern struct em5_buf buf;
 
 
 /**
@@ -79,11 +80,11 @@ struct vm_operations_struct em5_vm_ops = {
 	.close		= em5_vm_close,
 };
 
-//~ static int em5_fop_mmap (struct file *filp, struct vm_area_struct *vma)
-//~ {
-	//~ vma->vm_ops = &em5_vm_ops;
-	//~ return em5_buff_mmap( vma);
-//~ }
+static int em5_fop_mmap (struct file *filp, struct vm_area_struct *vma)
+{
+	vma->vm_ops = &em5_vm_ops;
+	return em5_buf_mmap( vma);
+}
 
 
 static int em5_fop_open (struct inode *inode, struct file *filp)
@@ -101,7 +102,7 @@ static struct file_operations fops = {
 	.owner		= THIS_MODULE,
 	.open		= em5_fop_open,
 	.release	= em5_fop_release,
-	//~ .mmap		= em5_fop_mmap,
+	.mmap		= em5_fop_mmap,
 	.unlocked_ioctl	= em5_fop_ioctl,
 	//~ .read		= em5_fop_read,
 };
@@ -113,20 +114,20 @@ int em5_charfile_init (int major, int minor)
 	if (!major) {
 		/// get dynamic major
 		ret = alloc_chrdev_region(&c_devno, minor, 1, MODULE_NAME);
-		PDEBUG( "Chardev got major %d", MAJOR(c_devno));
+		PDEVEL( "chardev got major %d.", MAJOR(c_devno));
 	} else {
 		c_devno = MKDEV(major, minor);
 		ret = register_chrdev_region( c_devno, 1, MODULE_NAME);
 	}
 	
 	if (ret < 0) {
-		PDEBUG( "can't register chardev major number %d!", MAJOR(c_devno));
+		PDEVEL( "can't register chardev major number %d!", MAJOR(c_devno));
 		return ret;
 	}
 	
 	c_dev = cdev_alloc();
 	if (c_dev == NULL) {
-		PDEBUG( "can't allocate cdev");
+		PDEVEL( "can't allocate cdev!");
 		return -ENOMEM;
 	}
 	
@@ -135,7 +136,7 @@ int em5_charfile_init (int major, int minor)
 	
 	ret = cdev_add( c_dev, c_devno, 1);
 	if (ret) {
-		PDEBUG("adding device to the system failed with error %d", ret);
+		PDEVEL("adding device to the system failed with error %d.", ret);
 		return ret;
 	}
 	return 0;

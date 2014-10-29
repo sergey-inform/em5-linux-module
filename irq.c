@@ -51,7 +51,7 @@ int em5_irq_init()
 		MODULE_NAME,
 		callback_id /*dev_id*/);
 	
-	PDEBUG("Got IRQ.");
+	PDEVEL("got IRQ.");
 	
 	if (err) {
 		return err;

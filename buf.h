@@ -1,6 +1,7 @@
 #ifndef EM5_buf_H
 #define EM5_buf_H
 
+
 /* Readout bufer */
 struct em5_buf {
 	void * vaddr;

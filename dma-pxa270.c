@@ -77,7 +77,7 @@ int em5_dma_init( struct em5_buf * buf)
 		PERROR("Can't get DMA with PRIO_HIGH.");
 		return -EBUSY;
 	}
-	PDEBUG("Got DMA channel %d.", dma_chan);
+	PDEVEL("got DMA channel %d.", dma_chan);
 	
 	DRCMR(74) = DRCMR_MAPVLD | (dma_chan & DRCMR_CHLNUM); //map DREQ<2> to selected channel
 	
@@ -108,8 +108,8 @@ int em5_dma_init( struct em5_buf * buf)
 	DDADR(dma_chan) = transfer.hw_desc_list;
 	wmb();
 	
-	PDEBUG("DMA src addr: %x", transfer.hw_addr);
-	PDEBUG("DMA dest addr: %x", transfer.hw_desc_list);
+	PDEVEL("DMA src addr: %x.", transfer.hw_addr);
+	PDEVEL("DMA dest addr: %x.", transfer.hw_desc_list);
 	
 	return 0;
 }
