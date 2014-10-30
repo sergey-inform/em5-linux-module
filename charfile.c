@@ -18,6 +18,35 @@ static struct cdev * c_dev = {0};
 extern struct em5_buf buf;
 
 
+static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
+{
+	long long newpos;
+	
+	switch(whence)
+	{
+	case SEEK_SET:
+		newpos = offset;
+		break;
+	
+	case SEEK_CUR:
+		newpos = fd->f_pos + offset;
+		break;
+
+	case SEEK_END:
+		newpos = buf.count; //no gaps
+		break;
+
+	default: /* can't happen */
+		return -EINVAL;
+	}
+	if (newpos < 0)
+		return -EINVAL;
+		
+	fd->f_pos = newpos;
+	return newpos;
+} 
+
+
 /**
    In ARM version of linux 2.6.x we can't get 8-bytes values with get_user.
    
@@ -83,7 +112,7 @@ struct vm_operations_struct em5_vm_ops = {
 static int em5_fop_mmap (struct file *filp, struct vm_area_struct *vma)
 {
 	vma->vm_ops = &em5_vm_ops;
-	return em5_buf_mmap( vma);
+	return em5_buf_mmap(&buf, vma);
 }
 
 
@@ -104,6 +133,7 @@ static struct file_operations fops = {
 	.release	= em5_fop_release,
 	.mmap		= em5_fop_mmap,
 	.unlocked_ioctl	= em5_fop_ioctl,
+	.llseek		= em5_fop_llseek,
 	//~ .read		= em5_fop_read,
 };
 

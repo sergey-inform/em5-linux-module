@@ -11,33 +11,58 @@
 #include "module.h"
 #include "buf.h"
 
-extern struct em5_buf buf;
-
-int em5_buf_mmap( struct vm_area_struct *vma)
+int em5_buf_mmap(struct em5_buf *buf, struct vm_area_struct *vma)
 /* Map the buffer to userspace */
 {
-	int ret;
+	int i = 0;
+	unsigned long uaddr = vma->vm_start;
 	unsigned long usize = vma->vm_end - vma->vm_start;
-	unsigned long bufsize = buf.size;
+	unsigned long bufsz = 0;
+	
+	if (!buf) {
+		pr_err("No memory to map!\n");
+		return -EINVAL;
+	}
+	
+	bufsz = buf->size;
 	
 	/* do not allow larger mapping then the number of pages allocated */
-	if (usize > bufsize) {
+	if (usize > bufsz) {
 		PERROR("You are trying to map larger area.");
 		return -EIO;
 	}
 	
 	/* make it foolproof */
-	if ( usize != bufsize ){
-		PERROR("You can'y mmap a part of whole buffer.");
+	if ( usize != bufsz ){
+		PERROR("You can't mmap a part of buffer.");
 		return -EINVAL;
 	}
+	
+	do {
+		int ret;
+		ret = vm_insert_page(vma, uaddr, buf->pages[i++]);
+		if (ret) {
+			pr_err("Remapping memory, error: %d\n", ret);
+			return ret;
+		}
+		uaddr += PAGE_SIZE;
+		usize -= PAGE_SIZE;
+	} while (usize > 0);
+	
 	
 	/* Note: remap_vmalloc_range sets VM_RESERVED flag in vma,
 	   so pages does not migrate in memory after that.
 	*/
-	ret = remap_vmalloc_range( vma, buf.vaddr, 0 /* page offset */ );
+	//~ ret = remap_vmalloc_range( vma, buf->vaddr, 0 /* page offset */ );
+	//~ if (ret) {
+		//~ PERROR("Failed to remap vmalloc range, addr: %x.", (uint)buf->vaddr);
+	//~ }
 	
-	return ret;
+	vma->vm_flags |= VM_RESERVED;
+	
+	//TODO:track refcount;
+	
+	return 0;
 }
 
 
@@ -71,7 +96,14 @@ int em5_buf_init(struct em5_buf *buf, size_t size)
 	if (!buf->vaddr)
 		buf->vaddr = vm_map_ram(buf->pages, buf->num_pages, -1 /*node*/, PAGE_KERNEL);
 	
+	/*fill buffer */
+	for (i = 0; i < (buf->num_pages); i++) {
+		*(int*)(buf->vaddr + PAGE_SIZE * i) = i;
+	}
+	
+	
 	buf->size = buf->num_pages * PAGE_SIZE;
+	buf->count = 0;
 	
 	return 0;	
 }

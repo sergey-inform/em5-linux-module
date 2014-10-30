@@ -36,17 +36,42 @@ static void dma_irq_handler( int channel, void *data)
 	return;
 }
 
-int em5_dma_stop(void)
+u32 _dma_calculate_len(void)
 {
-	//~ u32 ctrl = *XLREG_CTRL;
+	u32 page_count, byte_count;
+	u32 dcur, dinit;
+	
+	if (DCSR(dma_chan) == 0) { //channel is not initialized
+		return 0;
+	}
+	
+	dcur = DDADR(dma_chan);
+	dinit = transfer.hw_desc_list;
+	
+	if (dcur & DDADR_STOP) { //the last descriptor
+		page_count = transfer.desc_len/sizeof(*transfer.desc_list) ;
+	}
+	else {
+		page_count = (dcur - dinit)/sizeof(*transfer.desc_list);
+	}
+	byte_count = page_count * PAGE_SIZE - (DCMD(dma_chan) & DCMD_LENGTH);
+	
+	return byte_count;
+}
+
+u32 em5_dma_stop(void)
+/* Returns a number of written bytes. */
+{
+	unsigned int count;
 	*XLREG_CTRL &= ~DMA_ENA; //unset bit
 	
 	if(dma_chan!=-1) {
 		wmb();
 		DCSR(dma_chan) &= ~DCSR_RUN; //unset bit
 	}
-	
-	return 0;
+	count = _dma_calculate_len();
+	pr_debug("dma count: %d\n",  count);
+	return count;
 }
 
 int em5_dma_start(void)
@@ -64,8 +89,6 @@ int em5_dma_start(void)
 	return 0;
 }
 
-
-
 int em5_dma_init( struct em5_buf * buf)
 {
 	int i = 0;
@@ -80,7 +103,6 @@ int em5_dma_init( struct em5_buf * buf)
 	PDEVEL("got DMA channel %d.", dma_chan);
 	
 	DRCMR(74) = DRCMR_MAPVLD | (dma_chan & DRCMR_CHLNUM); //map DREQ<2> to selected channel
-	
 	
 	transfer.desc_len = buf->num_pages * sizeof(*transfer.desc_list);
 	transfer.desc_list = dma_alloc_coherent(dev, transfer.desc_len, &transfer.hw_desc_list, GFP_KERNEL);
@@ -103,6 +125,8 @@ int em5_dma_init( struct em5_buf * buf)
 		transfer.desc_list[i].dcmd  = dcmd | PAGE_SIZE;
 	}
 	transfer.desc_list[buf->num_pages - 1].ddadr = DDADR_STOP;
+	
+	DCSR(dma_chan) &= ~DCSR_RUN; //stop channel
 	wmb();
 	DSADR(dma_chan) = transfer.hw_addr;
 	DDADR(dma_chan) = transfer.hw_desc_list;
