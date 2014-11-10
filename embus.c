@@ -6,13 +6,20 @@
 #include <linux/io.h>	   /* ioremap, iounmap */
 #include <linux/mutex.h>
 
+#include "mach/gpio.h"	/* gpio_set_value, gpio_get_value */
+#include <linux/delay.h>
+
 #include "module.h"
 #include "em5.h"
 #include "embus.h"
 #include "xlregs.h"
 
+
+
 ulong xlbase = 0;
 ulong xlbase_hw = 0;
+
+#define gpio_nRST	36
 
 int embus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	
@@ -29,6 +36,13 @@ int embus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 		break; /*to suppress compilation warning*/
 	}
 	return 0;
+}
+
+void embus_reset() {
+	gpio_set_value(gpio_nRST, 0);
+	udelay(1);
+	gpio_set_value(gpio_nRST, 1);
+	return;
 }
 
 

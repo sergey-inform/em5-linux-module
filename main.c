@@ -13,7 +13,7 @@
 #include "embus.h"
 #include "irq.h"
 #include "charfile.h"
-#include "device.h"
+#include "sysfs.h"
 #include "em5.h"
  
 /* Module parameters */
@@ -40,6 +40,7 @@ static void em5_cleanup(void)
  */
 {
 	// the order is important!
+	em5_sysfs_free();
 	em5_charfile_free(); 
 	em5_debugfs_free();
 	em5_irq_free();
@@ -49,7 +50,6 @@ static void em5_cleanup(void)
 	em5_dma_free();
 #endif 
 	em5_buf_free(&buf);
-	em5_device_free();
 	return;
 }
 	
@@ -60,7 +60,6 @@ static int __init em5_init(void)
 	// init components one by one unless first error.
 	if(
 		// the order is important!
-		(err = em5_device_init()) ||
 		(err = em5_buf_init(&buf, param_buf_sz_mb * 1024 * 1024) ) ||
 		(err = em5_embus_init() ) || 
 #ifdef CONFIG_HAS_DMA
@@ -69,6 +68,7 @@ static int __init em5_init(void)
 		(err = em5_irq_init() ) ||
 		(err = em5_debugfs_init() ) || 
 		(err = em5_charfile_init( param_major, 0 /*minor*/ ) ) ||
+		(err = em5_sysfs_init()) ||
 		(err = 0) //ok
 	){
 		pr_err( MODULE_NAME " registration failed. Rolling back...\n");

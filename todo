@@ -1,9 +1,7 @@
 * interrupts
-* spill status output
 * signals
 * read(), write(). Ability to wait.
 
-* rename device.h to sysfs.h
 * add module parameter "debug"
 
 http://cliparser.sourceforge.net/

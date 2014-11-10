@@ -24,12 +24,11 @@ int em5_set_spill(int val);
 int em5_get_spill(void);
 
 typedef enum {
-	EM5_STATE_UNINIT,
-	EM5_STATE_READY,
-	EM5_STATE_SPILL,
-	EM5_STATE_OVERRUN,
-	EM5_STATE_ERROR,
-	EM5_STATE_MAX,
+	EM5_STATE_UNINIT    	= 0b00000000,
+	EM5_STATE_BUSY    	= 0b00000001,
+	EM5_STATE_SPILL    	= 0b00000010,
+	EM5_STATE_OVERRUN 	= 0b01000000,
+	EM5_STATE_ERROR   	= 0b10000000,
 } em5_state;
 
 extern em5_state em5_current_state;

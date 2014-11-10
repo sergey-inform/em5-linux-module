@@ -9,7 +9,7 @@
 #include "em5.h"
 #include "xlregs.h"
 
-em5_state em5_current_state = 0;
+em5_state em5_current_state = EM5_STATE_UNINIT;
 extern struct em5_buf buf;
 
 
@@ -18,7 +18,7 @@ int em5_readout_start(void)
 	int ret;
 	buf.count = 0;
 	ret = em5_dma_start();
-	em5_current_state = EM5_STATE_SPILL;
+	em5_current_state |= EM5_STATE_BUSY;
 	return ret;
 }
 
@@ -43,6 +43,7 @@ int em5_readout_stop(void)
 	
 	if (wtrailing * EMWORD_SZ + bcount > buf.size ) { //overrun?
 		wtrailing = (buf.size - bcount) / EMWORD_SZ; //prevent overflow
+		em5_current_state |= EM5_STATE_OVERRUN;
 		overrun = 1;
 	}
 	
@@ -51,7 +52,7 @@ int em5_readout_stop(void)
 		
 		if (!overrun) {
 			//some sort of DMA error? DMA not working?
-			em5_current_state = EM5_STATE_ERROR;
+			em5_current_state |= EM5_STATE_ERROR;
 			return -1;
 		}
 	}
@@ -63,7 +64,8 @@ int em5_readout_stop(void)
 	buf.count = bcount +  wtrailing * EMWORD_SZ;
 	pr_info("buf count: %lu\n",  buf.count );
 	
-	em5_current_state = overrun? EM5_STATE_OVERRUN : EM5_STATE_READY;
+	em5_current_state &= ~EM5_STATE_BUSY;
+		
 	return 0;
 }
 
@@ -71,9 +73,12 @@ int em5_set_spill(int val)
 {
 	if (val) {
 		//TODO: cleanup fifo;
+		em5_current_state |= EM5_STATE_SPILL;
 		em5_readout_start();
+		
 	} 
 	else {
+		em5_current_state &= ~EM5_STATE_SPILL;
 		em5_readout_stop();
 	}
 	return 0;
@@ -81,7 +86,9 @@ int em5_set_spill(int val)
 
 int em5_get_spill(void)
 {
-	
-	return 0;
+	if (em5_current_state & EM5_STATE_SPILL)
+		return 1;
+	else
+		return 0;
 }
 

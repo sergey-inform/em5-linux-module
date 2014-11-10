@@ -24,18 +24,20 @@ DECLARE_WAIT_QUEUE_HEAD(short_queue);
 
 irqreturn_t our_irq_handler(int irq, void * dev_id)
 {
-	//~ unsigned int flags1, flags2;
-	//~ int d;
-	//~ 
-	//~ flags1 = *XLREG_IFR;
-	//~ udelay(param_irq_delay);
-	//~ rmb();
-	//~ *XLREG_IFR = flags1; 
-	//~ wmb();
-	//~ udelay(param_irq_delay); 
-	//~ flags2 = *XLREG_IFR;
-	//~ 
-	//~ pr_info("!%x ~~~> %x \n", flags1,flags2);
+	unsigned int flags1, flags2;
+	int d;
+	
+	flags1 = *XLREG_IFR;
+	udelay(param_irq_delay);
+	rmb();
+	*XLREG_IFR = flags1; 
+	wmb();
+	udelay(param_irq_delay); 
+	flags2 = *XLREG_IFR;
+	
+	pr_info("!%x ~~~> %x \n", flags1,flags2);
+
+
 
 	return IRQ_HANDLED;
 }

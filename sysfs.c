@@ -9,18 +9,12 @@
 
 
 #include "module.h"
+#include "embus.h"
 #include "em5.h"
 
 //~ static const char ctrl_auto[] = "auto";
 //~ static const char ctrl_on[] = "on";
 
-static const char * str_state[EM5_STATE_MAX] = {
-	[EM5_STATE_UNINIT]	= "UNINIT",
-	[EM5_STATE_READY]	= "READY",
-	[EM5_STATE_SPILL]	= "SPILL",
-	[EM5_STATE_OVERRUN]	= "OVERRUN",
-	[EM5_STATE_ERROR]	= "ERROR",
-};
 
 struct platform_device *pdev;
 
@@ -29,6 +23,7 @@ static ssize_t spill_show(struct device *dev, struct device_attribute *attr, cha
 {
 	return sprintf(buf, "%d\n", em5_get_spill() ? 1 : 0);
 }
+
 static ssize_t spill_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
 {
 	unsigned long val;
@@ -49,18 +44,51 @@ static ssize_t spill_store(struct device * dev, struct device_attribute *attr, c
 	
 	return n;
 }
+
 static DEVICE_ATTR(spill, 0644, spill_show, spill_store);
 
+//----
+
+
+static ssize_t reset_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "write 1 to reset euromiss bus.\n");
+}
+
+static ssize_t reset_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
+{
+	unsigned long val;
+	if( strict_strtoul(buf, 10  /*base*/, &val)) {
+		pr_err();
+		return -EINVAL;
+	}
+
+	if (val == 1) {
+		embus_reset();
+	}
+	else {
+		return -EINVAL;
+	}
+
+	return n;
+}
+
+static DEVICE_ATTR(reset, 0644, reset_show, reset_store);
+
+//----
 
 static ssize_t state_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, str_state[em5_current_state]);
+	return sprintf(buf, "%X", em5_current_state);
 }
+
 static DEVICE_ATTR(state, 0444, state_show, NULL);
+
 
 static struct attribute *dev_attrs[] = {
 	&dev_attr_spill.attr,
 	&dev_attr_state.attr,
+	&dev_attr_reset.attr,
 	NULL,
 };
 
@@ -69,11 +97,7 @@ static struct attribute_group em5_attr_group = {
 		.attrs  = dev_attrs,
 };
 
-
-
-
-
-int em5_device_init( void)
+int em5_sysfs_init( void)
 {
 	int rc;
 	pdev = platform_device_register_simple(DEVICE_NAME, 0, NULL, 0);
@@ -89,7 +113,7 @@ int em5_device_init( void)
         return 0;
 }
 
-void em5_device_free( void)
+void em5_sysfs_free( void)
 {
 	sysfs_remove_group(&pdev->dev.kobj, &em5_attr_group);
 	platform_device_unregister(pdev);

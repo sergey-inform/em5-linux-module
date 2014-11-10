@@ -9,6 +9,7 @@ ARCH = arm
 CROSS_COMPILE = /home/user/toolchain/arm-linux-
 KERNELDIR = /home/user/linuxdir/
 TARGET = em5_module
+EXTRA_CFLAGS=-fno-pic #modversions
 
 ######################################################################
 # Do not modify below this line (unless you are know what you are doing)
@@ -28,7 +29,7 @@ ccflags-$(DEBUG) += $(DEBFLAGS)
 # kernel build system and can use its language.
 ifneq ($(KERNELRELEASE),)
 	obj-m += $(TARGET).o
-	$(TARGET)-objs := main.o buf.o embus.o irq.o charfile.o device.o em5.o
+	$(TARGET)-objs := main.o buf.o embus.o irq.o charfile.o sysfs.o em5.o
 	$(TARGET)-$(CONFIG_DEBUG_FS) += debugfs.o
 	$(TARGET)-$(CONFIG_HAS_DMA) += dma-pxa270.o
 	

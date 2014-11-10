@@ -6,8 +6,8 @@
 #define DEVICE_NAME	"em5"
 
 #ifndef EM5_MAJOR	/* can be specified at compile time to hardcode character device major number */
-	//~ #define EM5_MAJOR	0xE5
-	#define EM5_MAJOR	0   /* 0 means dynamic */
+	#define EM5_MAJOR	0xE5
+	//~ #define EM5_MAJOR	0   /* 0 means dynamic */
 #endif
 
 #define PDEBUG(format, args...)  printk(KERN_INFO MODULE_NAME": " format "\n" , ##args ) //TODO: replace with pr_devel (printk.h)
