@@ -7,7 +7,6 @@
 #include <linux/string.h>
 #include <asm/uaccess.h> /* copy_from_user */
 
-
 #include "module.h"
 #include "embus.h"
 #include "em5.h"
@@ -18,6 +17,7 @@
 
 struct platform_device *pdev;
 
+//-- spill --
 
 static ssize_t spill_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -47,8 +47,7 @@ static ssize_t spill_store(struct device * dev, struct device_attribute *attr, c
 
 static DEVICE_ATTR(spill, 0644, spill_show, spill_store);
 
-//----
-
+//-- reset --
 
 static ssize_t reset_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -75,20 +74,52 @@ static ssize_t reset_store(struct device * dev, struct device_attribute *attr, c
 
 static DEVICE_ATTR(reset, 0644, reset_show, reset_store);
 
-//----
+//-- state --
 
 static ssize_t state_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%X", em5_current_state);
+	return sprintf(buf, "%X\n", em5_current_state);
 }
 
 static DEVICE_ATTR(state, 0444, state_show, NULL);
 
+#ifdef PXA_MSC_CONFIG
+
+//-- xlbus --
+static ssize_t xlbus_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%X\n", embus_msc_get());
+}
+
+static ssize_t xlbus_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
+{
+	unsigned long val;
+	if( strict_strtoul(buf, 16  /*base*/, &val)) {
+		pr_err("not a hex number!");
+		return -EINVAL;
+	}
+	if ( val > 0xFFFF) {
+		pr_err("two bytes!");
+		return -EINVAL;
+	}
+	embus_msc_set((unsigned)val);
+
+	return n;
+}
+
+static DEVICE_ATTR(xlbus, 0660, xlbus_show, xlbus_store);
+
+#endif
+
+//------------
 
 static struct attribute *dev_attrs[] = {
 	&dev_attr_spill.attr,
 	&dev_attr_state.attr,
 	&dev_attr_reset.attr,
+#ifdef PXA_MSC_CONFIG
+	&dev_attr_xlbus.attr,
+#endif
 	NULL,
 };
 

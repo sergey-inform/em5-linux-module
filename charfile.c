@@ -61,6 +61,7 @@ static long em5_fop_ioctl (struct file * fd, unsigned int ctl, unsigned long add
    Returns em5 status register on success, negative value on error.
 */
 {
+	// TODO: finish or remove ioctls from driver
 	int ret = 0;
 
 	/* sanity check */

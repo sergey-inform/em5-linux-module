@@ -10,6 +10,9 @@
 #include <sys/ioctl.h>
 #endif
 
+//reconfigure pxa static memory for embus
+#define PXA_MSC_CONFIG
+
 typedef unsigned long emword;	/* EuroMISS word: addr+data */
 
 #define EM5_MAGIC	0x62356d65	/*the chosen bit pattern*/ 

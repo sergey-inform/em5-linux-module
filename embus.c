@@ -4,6 +4,7 @@
 
 #include <linux/ioport.h>	/* request_mem_region */
 #include <linux/io.h>	   /* ioremap, iounmap */
+//~ #include <asm/io.h>	/* ioread, iowrite */
 #include <linux/mutex.h>
 
 #include "mach/gpio.h"	/* gpio_set_value, gpio_get_value */
@@ -14,12 +15,19 @@
 #include "embus.h"
 #include "xlregs.h"
 
-
-
 ulong xlbase = 0;
 ulong xlbase_hw = 0;
-
 #define gpio_nRST	36
+
+
+#ifdef PXA_MSC_CONFIG
+#define PXA_MSC_BASE	0x48000000
+#define PXA_MSC_LEN	0x14
+#define MSC1_OFF   	0x0C
+#define MSC2_OFF   	0x10
+ulong mscbase = 0;
+ulong mscbase_hw = 0;
+#endif
 
 int embus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	
@@ -45,6 +53,26 @@ void embus_reset() {
 	return;
 }
 
+#ifdef PXA_MSC_CONFIG
+
+unsigned embus_msc_get(void)
+{
+	unsigned val = ioread32((void*)(mscbase + MSC1_OFF));
+	//get cs3 (left 16 bits)
+	return (val >> 16);
+}
+
+void embus_msc_set(unsigned val)
+{
+	int addr = mscbase + MSC1_OFF;
+	unsigned new, old =  ioread32((void*)addr);
+	old &= 0x0000FFFF; 	// save CS2 settings
+	new = old | ((val & 0xFFFF) <<16);
+	iowrite32(new, (void*)addr);
+	return;
+}
+
+#endif
 
 int __init em5_embus_init() 
 {
@@ -63,6 +91,24 @@ int __init em5_embus_init()
 	
 	PDEBUG("xlbase ioremapped %lx->%lx", xlbase_hw, xlbase);
 	
+#ifdef PXA_MSC_CONFIG
+	
+	if ( !request_mem_region( PXA_MSC_BASE, PXA_MSC_LEN, MODULE_NAME) ) {
+		pr_err( "can't get I/O mem address 0x%lx!", mscbase_hw);
+		return -ENODEV;
+	}
+	
+	mscbase_hw = PXA_MSC_BASE;
+	mscbase = (unsigned long )ioremap_nocache( mscbase_hw, PXA_MSC_LEN);
+	
+	if ( !mscbase) {
+		pr_err( "%lx ioremap failed!", mscbase_hw);
+		return -ENOMEM;
+	}
+	
+	PDEBUG("pxa-msc conrol registers ioremapped %lx->%lx", mscbase, mscbase);
+#endif
+	
 	return 0;
 }
 
@@ -75,5 +121,15 @@ void em5_embus_free()
 	if (xlbase_hw) {
 		release_mem_region(xlbase_hw, XLBASE_LEN);
 	}
+	
+#ifdef PXA_MSC_CONFIG
+	if (mscbase_hw && mscbase) { // request_mem_region and ioremap was done
+		iounmap( (void __iomem *) mscbase ); 
+	}
+	if (mscbase_hw) {
+		release_mem_region(mscbase_hw, PXA_MSC_LEN);
+	}
+#endif
+
 	return;
 }
