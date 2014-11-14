@@ -101,9 +101,13 @@ static long em5_fop_ioctl (struct file * fd, unsigned int ctl, unsigned long add
 // em5_fop_read
 
 void em5_vm_open(struct vm_area_struct *vma)
-{}
+{
+	//~ pr_devel("vm open\n");
+}
 void em5_vm_close(struct vm_area_struct *vma)
-{}
+{
+	
+}
 
 struct vm_operations_struct em5_vm_ops = {
 	.open 		= em5_vm_open,
@@ -113,20 +117,43 @@ struct vm_operations_struct em5_vm_ops = {
 static int em5_fop_mmap (struct file *filp, struct vm_area_struct *vma)
 {
 	vma->vm_ops = &em5_vm_ops;
+	//~ pr_devel("file mmap\n");
 	return em5_buf_mmap(&buf, vma);
 }
 
 
 static int em5_fop_open (struct inode *inode, struct file *filp)
 {
+	
+	//~ pr_devel("file open\n");
 	return 0;
 }
 
 static int em5_fop_release (struct inode *inode, struct file *filp)
 {
+	
+	//~ pr_devel("file release\n");
 	return 0;
 }
 
+static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count, loff_t *f_pos)
+{
+	void * rp;
+	rp = (void *) (buf.vaddr + *f_pos);
+	
+	if (*f_pos > buf.count)
+		return -EFAULT;
+		
+	count = min(count, (size_t)(buf.count - *f_pos));
+	
+	if (copy_to_user(ubuf, rp, count)) {
+//~ 166                 up (&dev->sem);
+		return -EFAULT;
+	}
+	
+	*f_pos += count;
+	return count;
+}
 
 static struct file_operations fops = {
 	.owner		= THIS_MODULE,
@@ -135,7 +162,7 @@ static struct file_operations fops = {
 	.mmap		= em5_fop_mmap,
 	.unlocked_ioctl	= em5_fop_ioctl,
 	.llseek		= em5_fop_llseek,
-	//~ .read		= em5_fop_read,
+	.read		= em5_fop_read,
 };
 
 int em5_charfile_init (int major, int minor)
