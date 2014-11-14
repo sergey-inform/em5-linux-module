@@ -3,6 +3,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/sched.h>        /* TASK_INTERRUPTIBLE */
 
 #include "module.h"
 #include "dma.h"
@@ -11,7 +12,7 @@
 
 em5_state em5_current_state = EM5_STATE_UNINIT;
 extern struct em5_buf buf;
-
+extern wait_queue_head_t openq;
 
 int em5_readout_start(void)
 {
@@ -19,6 +20,7 @@ int em5_readout_start(void)
 	buf.count = 0;
 	ret = em5_dma_start();
 	em5_current_state |= EM5_STATE_BUSY;
+	//disable embus operations
 	return ret;
 }
 
@@ -65,7 +67,10 @@ int em5_readout_stop(void)
 	pr_info("buf count: %lu\n",  buf.count );
 	
 	em5_current_state &= ~EM5_STATE_BUSY;
-		
+	//enable embus operations
+	
+	wake_up_interruptible(&openq); //wake up file openers
+	 
 	return 0;
 }
 

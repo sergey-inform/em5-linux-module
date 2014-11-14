@@ -6,6 +6,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h> /* vma */
 #include <asm/uaccess.h> /* access_ok */
+#include <linux/sched.h>        /* TASK_INTERRUPTIBLE */
 
 #include "module.h"
 #include "charfile.h"
@@ -15,8 +16,10 @@
 
 static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};
-extern struct em5_buf buf;
+wait_queue_head_t openq;
 
+extern struct em5_buf buf;
+extern em5_state em5_current_state;
 
 static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 {
@@ -102,12 +105,10 @@ static long em5_fop_ioctl (struct file * fd, unsigned int ctl, unsigned long add
 
 void em5_vm_open(struct vm_area_struct *vma)
 {
-	//~ pr_devel("vm open\n");
+	pr_devel("vm open\n");
 }
 void em5_vm_close(struct vm_area_struct *vma)
-{
-	
-}
+{}
 
 struct vm_operations_struct em5_vm_ops = {
 	.open 		= em5_vm_open,
@@ -124,6 +125,11 @@ static int em5_fop_mmap (struct file *filp, struct vm_area_struct *vma)
 
 static int em5_fop_open (struct inode *inode, struct file *filp)
 {
+	if (filp->f_flags & O_NONBLOCK)
+		return -EAGAIN;
+
+	if (wait_event_interruptible(openq, !(em5_current_state & EM5_STATE_BUSY) ))
+		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 	
 	//~ pr_devel("file open\n");
 	return 0;
@@ -131,8 +137,6 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 
 static int em5_fop_release (struct inode *inode, struct file *filp)
 {
-	
-	//~ pr_devel("file release\n");
 	return 0;
 }
 
@@ -147,13 +151,13 @@ static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count,
 	count = min(count, (size_t)(buf.count - *f_pos));
 	
 	if (copy_to_user(ubuf, rp, count)) {
-//~ 166                 up (&dev->sem);
 		return -EFAULT;
 	}
 	
 	*f_pos += count;
 	return count;
 }
+
 
 static struct file_operations fops = {
 	.owner		= THIS_MODULE,
@@ -168,6 +172,8 @@ static struct file_operations fops = {
 int em5_charfile_init (int major, int minor)
 {
 	int ret;
+	
+	init_waitqueue_head(&openq);
 	
 	if (!major) {
 		/// get dynamic major
