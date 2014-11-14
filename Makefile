@@ -1,6 +1,7 @@
 # Comment/uncomment the following line to enable/disable debugging
 DEBUG = y
-INSTALLDIR :=/home/user/nfsroot/root/
+INSTALLDIR1 :=/home/user/em5_rootfs_overlay/opt/
+INSTALLDIR2 :=/home/user/nfsroot/root/
 
 #Comment/uncomment the following lines to crosscompile for guest architecture
 ARCH = arm
@@ -43,8 +44,10 @@ default:
 endif
 
 install: $(TARGET).ko
-	install -d $(INSTALLDIR)
-	install -c $(TARGET).ko $(INSTALLDIR)
+	install -d $(INSTALLDIR1)
+	install -d $(INSTALLDIR2)
+	install -c $(TARGET).ko $(INSTALLDIR1)
+	install -c $(TARGET).ko $(INSTALLDIR2)
 
 clean:
 	$(MAKEARCH) -C $(KERNELDIR) M=$(PWD) clean
