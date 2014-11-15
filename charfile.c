@@ -1,6 +1,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+//~ #include <linux/pid.h>
 
 #include <linux/cdev.h>
 #include <linux/fs.h>
@@ -16,10 +17,12 @@
 
 static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};
-wait_queue_head_t openq;
+DECLARE_WAIT_QUEUE_HEAD(openq);
+struct pid * pid_reader = NULL; //TODO: make a list of readers
 
 extern struct em5_buf buf;
 extern em5_state em5_current_state;
+
 
 static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 {
@@ -127,16 +130,31 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 {
 	if (filp->f_flags & O_NONBLOCK)
 		return -EAGAIN;
-
-	if (wait_event_interruptible(openq, !(em5_current_state & EM5_STATE_BUSY) ))
+	
+	//TODO: lock semaphore here
+	if (pid_reader && pid_task(pid_reader, PIDTYPE_PID)) { //someone already reads
+		return -EBUSY;
+	}
+	
+	if (wait_event_interruptible(openq, em5_current_state & EM5_STATE_DREADY) )
 		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 	
-	//~ pr_devel("file open\n");
+	pid_reader = get_task_pid(current, PIDTYPE_PID);
+	
+	//: unlock semaphore
+	em5_current_state &= ~EM5_STATE_DREADY; // unset bit
+	pr_devel("file open,  PID: %d\n", pid_nr(pid_reader));
 	return 0;
 }
 
 static int em5_fop_release (struct inode *inode, struct file *filp)
 {
+	struct pid * pid  = get_task_pid(current, PIDTYPE_PID); 
+	if (pid_reader == pid) {
+		pid_reader = NULL;
+		pr_devel("file close, unset reader PID: %d\n", pid_nr(pid));
+	}
+	
 	return 0;
 }
 
@@ -173,7 +191,7 @@ int em5_charfile_init (int major, int minor)
 {
 	int ret;
 	
-	init_waitqueue_head(&openq);
+	//~ init_waitqueue_head(&openq);
 	
 	if (!major) {
 		/// get dynamic major

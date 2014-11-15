@@ -15,6 +15,7 @@
 #include "charfile.h"
 #include "sysfs.h"
 #include "em5.h"
+#include "xlregs.h" //FIXME: delme
  
 /* Module parameters */
 static uint param_major = EM5_MAJOR;
@@ -77,6 +78,8 @@ static int __init em5_init(void)
 	}
 	
 	pr_info( MODULE_NAME " has been loaded.\n" );
+	*XLREG_CTRL |= BS_ENA;
+	*XLREG_CTRL |= ES_ENA;
 	return err;
 }
 

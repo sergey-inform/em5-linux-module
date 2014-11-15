@@ -20,13 +20,13 @@ extern ulong xlbase_hw;
 
 
 /* Control register bits*/
-#define TRIG_ENA  	1<<6	// Enable pchi by front panel input
-#define PROG_BUSY  	1<<5	// Set busy output
-#define FE_ENA  	1<<4
-#define FF_ENA  	1<<3
-#define ES_ENA  	1<<2
-#define BS_ENA  	1<<1	
-#define DMA_ENA  	1<<0	// Enable DREQ2
+#define TRIG_ENA  	(1<<6)	// Enable pchi by front panel input
+#define PROG_BUSY  	(1<<5)	// Set busy output
+#define FE_ENA  	(1<<4)
+#define FF_ENA  	(1<<3)
+#define ES_ENA  	(1<<2)
+#define BS_ENA  	(1<<1)	
+#define DMA_ENA  	(1<<0)	// Enable DREQ2
 
 /* Status register */
 #define FF_EMPTY  	0x1
@@ -37,9 +37,9 @@ extern ulong xlbase_hw;
 
 
 /* Interrupt flag register */
-#define IFR_BS		1<<1	// Begin-of-Spill
-#define IFR_ES		1<<2	// End-of-Spill
-#define IFR_FF		1<<3	// fifo almost full
-#define IFR_FE		1<<4	// fifo empty
+#define IFR_BS		(1<<1)	// Begin-of-Spill
+#define IFR_ES		(1<<2)	// End-of-Spill
+#define IFR_FF		(1<<3)	// fifo almost full
+#define IFR_FE		(1<<4)	// fifo empty
 
 

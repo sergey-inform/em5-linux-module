@@ -63,7 +63,11 @@ u32 em5_dma_stop(void)
 /* Returns a number of written bytes. */
 {
 	unsigned int count;
-	*XLREG_CTRL &= ~DMA_ENA; //unset bit
+	u32 ctrl = *XLREG_CTRL;
+	rmb();
+	
+	*XLREG_CTRL = ctrl & ~DMA_ENA; //unset bit
+	wmb();
 	
 	if(dma_chan!=-1) {
 		wmb();
@@ -76,15 +80,19 @@ u32 em5_dma_stop(void)
 
 int em5_dma_start(void)
 {
-	//~ u32 ctrl = XLREG_CTRL;
+	
+	u32 ctrl = *XLREG_CTRL;
 	DDADR(dma_chan) = transfer.hw_desc_list;
-	*XLREG_CTRL |= DMA_ENA;
+	wmb();
+	
 	
 	
 	if(dma_chan!=-1) {
 		wmb();
 		DCSR(dma_chan) |= DCSR_RUN;
 	}
+	
+	*XLREG_CTRL = ctrl | DMA_ENA;
 	
 	return 0;
 }

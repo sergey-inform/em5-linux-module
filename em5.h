@@ -30,6 +30,7 @@ typedef enum {
 	EM5_STATE_UNINIT    	= 0b00000000,
 	EM5_STATE_BUSY    	= 0b00000001,
 	EM5_STATE_SPILL    	= 0b00000010,
+	EM5_STATE_DREADY    	= 0b00000100, //buffer is untouched
 	EM5_STATE_OVERRUN 	= 0b01000000,
 	EM5_STATE_ERROR   	= 0b10000000,
 } em5_state;
