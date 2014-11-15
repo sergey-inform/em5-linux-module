@@ -13,7 +13,7 @@
 #include "charfile.h"
 #include "buf.h"
 #include "em5.h"
-#include "embus.h"
+#include "xlbus.h"
 
 static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};

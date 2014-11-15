@@ -8,7 +8,7 @@
 #include <linux/delay.h> /* irq_set_irq_type */
 #include <linux/workqueue.h>
 
-#include "embus.h"
+#include "xlbus.h"
 #include "module.h"
 #include "irq.h"
 #include "xlregs.h"

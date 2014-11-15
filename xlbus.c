@@ -12,7 +12,7 @@
 
 #include "module.h"
 #include "em5.h"
-#include "embus.h"
+#include "xlbus.h"
 #include "xlregs.h"
 
 ulong xlbase = 0;

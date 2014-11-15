@@ -10,7 +10,7 @@
 #include "dma.h"
 
 #include "debugfs.h"
-#include "embus.h"
+#include "xlbus.h"
 #include "irq.h"
 #include "charfile.h"
 #include "sysfs.h"

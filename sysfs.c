@@ -8,7 +8,7 @@
 #include <asm/uaccess.h> /* copy_from_user */
 
 #include "module.h"
-#include "embus.h"
+#include "xlbus.h"
 #include "em5.h"
 
 //~ static const char ctrl_auto[] = "auto";
