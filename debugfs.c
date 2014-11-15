@@ -12,7 +12,7 @@ static struct dentry *d_root, *d_regs;
 
 typedef struct { 
 		char *name;
-		void *addr;
+		volatile void *addr;
 } Items;
 	
 int __init em5_debugfs_init() 
@@ -46,7 +46,7 @@ int __init em5_debugfs_init()
 	//regs items
 	for (i=0; i<arrlen(xlregs); i++) {
 		entry = debugfs_create_x32( xlregs[i].name,
-				S_IRUGO|S_IWUSR, d_regs, xlregs[i].addr);
+				S_IRUGO|S_IWUSR, d_regs, (u32 *)xlregs[i].addr);
 				
 		if (IS_ERR(entry)) {
 			pr_err("Failed to create file \"%s\" in debugfs.\n",

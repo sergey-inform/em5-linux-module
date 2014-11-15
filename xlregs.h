@@ -4,7 +4,7 @@
 extern ulong xlbase; // it's ioremapped in em5_embus_init
 extern ulong xlbase_hw; 
 
-#define _XLREG(reg)	(u32 *)(xlbase + reg)
+#define _XLREG(reg)	(volatile u32 *)(xlbase + reg)
 
 #define XLREG_DATA 	_XLREG(0x0)		// 4-byte data register
 #define XLREG_DATA_HW	(u32)(xlbase_hw + 0x0)

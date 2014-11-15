@@ -1,6 +1,8 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/io.h>
+
 #include <linux/interrupt.h>
 #include <linux/irq.h> /* irq_set_irq_type */
 #include <linux/delay.h> /* irq_set_irq_type */
@@ -40,18 +42,20 @@ void do_spill_wq(struct work_struct *work)
 {
 	u32 ctrl;
 	my_work_t * my_work = (my_work_t *)work;
-	ctrl = *XLREG_CTRL;
+	
 	rmb();
 	switch (my_work->type)
 	{
 	case BS:
 		pr_warn("BS!\n");
 		em5_set_spill(1);
-		*XLREG_CTRL = ctrl | TRIG_ENA;  //enable trig;
+		ctrl = ioread32(XLREG_CTRL);
+		iowrite32(ctrl | TRIG_ENA, XLREG_CTRL); //enable trig;
 		break;
 	
 	case ES:
 		pr_warn("ES!\n");
+		ctrl = *XLREG_CTRL;
 		*XLREG_CTRL = ctrl & ~TRIG_ENA; //disable triggers
 		em5_set_spill(0);
 		break;

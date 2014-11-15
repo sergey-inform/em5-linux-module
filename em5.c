@@ -50,6 +50,7 @@ int em5_readout_stop(void)
 {
 	int i;
 	int overrun = 0;
+	int trailing = 0;
 	unsigned int wtrailing = 0 ;
 	unsigned int bcount;
 	
@@ -58,7 +59,7 @@ int em5_readout_stop(void)
 	//TODO: check dma errors
 	
 	/*read trailing bytes*/
-	while (	wtrailing += WRCOUNT(*XLREG_STAT) ) //leftover in FIFO
+	while (( wtrailing = WRCOUNT(*XLREG_STAT) )) //leftover in FIFO
 	{
 		if (wtrailing * EMWORD_SZ + bcount > buf.size ) { //overrun?
 			wtrailing = (buf.size - bcount) / EMWORD_SZ; //prevent overflow
@@ -77,9 +78,10 @@ int em5_readout_stop(void)
 		}
 		
 		for (i=0; i<wtrailing; i++){
-			((u32 *)buf.vaddr)[bcount/EMWORD_SZ+i] = *XLREG_DATA;
+			((u32 *)buf.vaddr)[bcount/EMWORD_SZ + i] = *XLREG_DATA;
 		}
-		bcount +  wtrailing * EMWORD_SZ;
+		
+		bcount += wtrailing * EMWORD_SZ;
 	}
 	
 	buf.count = bcount;

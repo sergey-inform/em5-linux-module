@@ -66,13 +66,14 @@ u32 em5_dma_stop(void)
 	u32 ctrl = *XLREG_CTRL;
 	rmb();
 	
-	*XLREG_CTRL = ctrl & ~DMA_ENA; //unset bit
-	wmb();
-	
 	if(dma_chan!=-1) {
 		wmb();
 		DCSR(dma_chan) &= ~DCSR_RUN; //unset bit
 	}
+	
+	*XLREG_CTRL = ctrl & ~DMA_ENA; //unset bit
+	wmb();
+	
 	count = _dma_calculate_len();
 	pr_debug("dma count: %d\n",  count);
 	return count;
@@ -85,14 +86,13 @@ int em5_dma_start(void)
 	DDADR(dma_chan) = transfer.hw_desc_list;
 	wmb();
 	
-	
+	iowrite32(ctrl | DMA_ENA, XLREG_CTRL);
+	pr_debug("dma_start ctrl: %X", ioread32(XLREG_CTRL));
 	
 	if(dma_chan!=-1) {
-		wmb();
 		DCSR(dma_chan) |= DCSR_RUN;
+		wmb();
 	}
-	
-	*XLREG_CTRL = ctrl | DMA_ENA;
 	
 	return 0;
 }
