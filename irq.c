@@ -55,8 +55,8 @@ void do_spill_wq(struct work_struct *work)
 	
 	case ES:
 		pr_warn("ES!\n");
-		ctrl = *XLREG_CTRL;
-		*XLREG_CTRL = ctrl & ~TRIG_ENA; //disable triggers
+		ctrl = ioread32(XLREG_CTRL);
+		iowrite32( ctrl & ~TRIG_ENA, XLREG_CTRL); //disable triggers
 		em5_set_spill(0);
 		break;
 	}
@@ -68,7 +68,7 @@ void do_spill_wq(struct work_struct *work)
 irqreturn_t our_irq_handler(int irq, void * dev_id)
 {
 	unsigned int flags;
-	flags = *XLREG_IFR;
+	flags = ioread32(XLREG_IFR);
 	rmb();
 	
 	if (flags & IFR_BS) {
@@ -92,7 +92,7 @@ irqreturn_t our_irq_handler(int irq, void * dev_id)
 	}
 	
 	
-	*XLREG_IFR = flags; //clear flags
+	iowrite32(flags, XLREG_IFR); //clear flags
 	wmb();
 	return IRQ_HANDLED;
 }

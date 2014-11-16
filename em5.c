@@ -4,6 +4,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/sched.h>        /* TASK_INTERRUPTIBLE */
+#include <linux/io.h>
 
 #include "module.h"
 #include "dma.h"
@@ -50,16 +51,17 @@ int em5_readout_stop(void)
 {
 	int i;
 	int overrun = 0;
-	int trailing = 0;
 	unsigned int wtrailing = 0 ;
 	unsigned int bcount;
 	
 	bcount = em5_dma_stop();
+	pr_devel("bcount: %d", bcount);
+	
 	
 	//TODO: check dma errors
 	
 	/*read trailing bytes*/
-	while (( wtrailing = WRCOUNT(*XLREG_STAT) )) //leftover in FIFO
+	while (( wtrailing = WRCOUNT(ioread32(XLREG_STAT)) )) //leftover in FIFO
 	{
 		if (wtrailing * EMWORD_SZ + bcount > buf.size ) { //overrun?
 			wtrailing = (buf.size - bcount) / EMWORD_SZ; //prevent overflow
@@ -73,12 +75,16 @@ int em5_readout_stop(void)
 			if (!overrun) {
 				//some sort of DMA error? DMA not working?
 				em5_current_state |= EM5_STATE_ERROR;
-				//~ return -1;
+				return -1;
 			}
 		}
 		
+		if (overrun) {
+			break;
+		}
+		
 		for (i=0; i<wtrailing; i++){
-			((u32 *)buf.vaddr)[bcount/EMWORD_SZ + i] = *XLREG_DATA;
+			((u32 *)buf.vaddr)[bcount/EMWORD_SZ + i] = ioread32(XLREG_DATA);
 		}
 		
 		bcount += wtrailing * EMWORD_SZ;

@@ -33,61 +33,124 @@ struct dma_transfer {
 
 static void dma_irq_handler( int channel, void *data)
 {
-	return;
+	
+	
 }
 
 u32 _dma_calculate_len(void)
 {
 	u32 page_count, byte_count;
-	u32 dcur, dinit;
+	u32 ddadr, dinit;
 	
 	if (DCSR(dma_chan) == 0) { //channel is not initialized
 		return 0;
 	}
 	
-	dcur = DDADR(dma_chan);
+	ddadr = DDADR(dma_chan);
+	pr_err("ddadr: %X", ddadr); //fuckup
+	
+	
+	
 	dinit = transfer.hw_desc_list;
 	
-	if (dcur & DDADR_STOP) { //the last descriptor
+	if (ddadr & DDADR_STOP) { //the last descriptor
 		page_count = transfer.desc_len/sizeof(*transfer.desc_list) ;
 	}
 	else {
-		page_count = (dcur - dinit)/sizeof(*transfer.desc_list);
+		page_count = (ddadr - dinit) / sizeof(*transfer.desc_list);
 	}
 	byte_count = page_count * PAGE_SIZE - (DCMD(dma_chan) & DCMD_LENGTH);
 	
-	return byte_count;
+	return 	byte_count;
 }
+
+void _dma_restart(void) 
+{
+	struct pxa_dma_desc *dummy_desc;
+	dma_addr_t hw_dummy_desc;
+	
+	dummy_desc = dma_alloc_coherent(dev, sizeof(struct pxa_dma_desc), &hw_dummy_desc, GFP_KERNEL);
+	if (dummy_desc == NULL) {
+		pr_err("Can't allocate memory for dummy_desc, %d bytes", sizeof(struct pxa_dma_desc));
+		return;
+	}
+	
+	dummy_desc->dsadr = transfer.hw_desc_list;
+	dummy_desc->dtadr = transfer.hw_desc_list+32;
+	dummy_desc->ddadr = DDADR_STOP;
+	dummy_desc->dcmd  = DCMD_INCSRCADDR| DCMD_INCTRGADDR | /*DCMD_LENGTH =*/ 1;
+	
+	DDADR(dma_chan) = hw_dummy_desc;
+	wmb();
+	if(dma_chan!=-1)
+		DCSR(dma_chan) = DCSR_RUN; //zero-length transfer should complete immediately
+	
+	dma_free_coherent(dev, sizeof(struct pxa_dma_desc), dummy_desc, hw_dummy_desc);
+	return;
+}
+
+#define DRQSR2 DMAC_REG(0xE8) /*DREQ2 Status Register*/
+#define DRQSR_CLR (1<<8)
 
 u32 em5_dma_stop(void)
 /* Returns a number of written bytes. */
 {
 	unsigned int count;
-	u32 ctrl = *XLREG_CTRL;
-	rmb();
+	u32 dcsr;
+	int dreqs;
+	iowrite32( ioread32(XLREG_CTRL) & ~DMA_ENA, XLREG_CTRL); //unset bit
+	
+
+	if ( DCSR(dma_chan) & DCSR_REQPEND) {
+		pr_devel("PENDING requests!");
+	}
+	
+	/* important! wait for pending requests before STOP, or DDADR will be 00000001 */
+	while (( dcsr = DCSR(dma_chan) )) {
+		if ( (dcsr & DCSR_REQPEND) && !(dcsr & DCSR_STOPSTATE) )
+			pr_devel("wait");
+			//DODO: Timeout for safety; DMA error on timeout.
+		else
+			break;
+	};
+	
+	
+	
+	count = _dma_calculate_len(); //before stop!, because stop clears DDADR
+	
 	
 	if(dma_chan!=-1) {
-		wmb();
 		DCSR(dma_chan) &= ~DCSR_RUN; //unset bit
 	}
 	
-	*XLREG_CTRL = ctrl & ~DMA_ENA; //unset bit
-	wmb();
+	/*pending requests*/
 	
-	count = _dma_calculate_len();
-	pr_debug("dma count: %d\n",  count);
+	dreqs = 0x3f & DRQSR2;
+
+	//~ DDADR(dma_chan) = 0; //reset PENDING
+	
+	pr_devel("non-handled dreqs: %d", dreqs);
+	
+	
+	pr_devel("after stop: DDADR %X, DTADR:%X, DCSR %X",DDADR(dma_chan), DTADR(dma_chan), DCSR(dma_chan));
+	pr_devel("dma count: %d\n",  count);
 	return count;
 }
 
 int em5_dma_start(void)
 {
+	u32 ctrl;
 	
-	u32 ctrl = *XLREG_CTRL;
+	_dma_restart();
+	ctrl = ioread32(XLREG_CTRL);
+	DRQSR2 = DRQSR_CLR; //clear PENDING
 	DDADR(dma_chan) = transfer.hw_desc_list;
 	wmb();
 	
 	iowrite32(ctrl | DMA_ENA, XLREG_CTRL);
-	pr_debug("dma_start ctrl: %X", ioread32(XLREG_CTRL));
+	pr_devel("dma_start ctrl: %X", ioread32(XLREG_CTRL));
+	pr_devel("dma_start: DCSR %X", DCSR(dma_chan));
+	
 	
 	if(dma_chan!=-1) {
 		DCSR(dma_chan) |= DCSR_RUN;
@@ -105,7 +168,7 @@ int em5_dma_init( struct em5_buf * buf)
 	dma_chan = pxa_request_dma( MODULE_NAME, DMA_PRIO_HIGH,
 		       	dma_irq_handler, NULL /* void* data */);
 	if (dma_chan < 0) {
-		PERROR("Can't get DMA with PRIO_HIGH.");
+		pr_err("Can't get DMA with PRIO_HIGH.");
 		return -EBUSY;
 	}
 	PDEVEL("got DMA channel %d.", dma_chan);
