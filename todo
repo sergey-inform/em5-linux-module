@@ -1,7 +1,3 @@
-* interrupts
-* signals
-* read(), write(). Ability to wait.
-
 * add module parameter "debug"
 
 http://cliparser.sourceforge.net/
