@@ -10,7 +10,20 @@
 #include <sys/ioctl.h>
 #endif
 
-//reconfigure pxa static memory for embus
+#include <asm/atomic.h>
+
+
+struct spill_stats {
+	//~ dma_bytes
+	//~ cpu_bytes
+	//~ trailing_bytes
+	atomic_t fifo_fulls;
+	//~ 
+};
+
+
+
+//reconfigure pxa static memory for xlbus
 #define PXA_MSC_CONFIG
 
 typedef unsigned long emword;	/* EuroMISS word: addr+data */
@@ -34,6 +47,21 @@ typedef enum {
 	EM5_STATE_OVERRUN 	= 0b01000000,
 	EM5_STATE_ERROR   	= 0b10000000,
 } em5_state;
+
+
+//~ enum status_bits {
+	//~ EM5_FIFO_READOUT, //FIFO is being reading out
+	//~ EM5_DREADY, //New data in readout buffer for userspace process
+	//~ EM5_OVERRUN, //
+//~ };
+//~ 
+//~ enum spill_bits {
+	//~ 
+//~ };
+
+/* USE asm/bitops.h for atomic aceess to status bits! */
+//~ unsigned long em5_status; //TODO: rename to state
+
 
 extern em5_state em5_current_state;
 
@@ -64,7 +92,7 @@ typedef enum {
 	//~ EM5_RESERVED6,
 	//~ EM5_RESERVED7,
 	//~ EM5_RESERVED8,
-	//~ EM5_EMBUS_CMD_MAXNR, /*!*/
+	//~ EM5_XLBUS_CMD_MAXNR, /*!*/
 	//~ 
 	//~ EM5_READOUT_START,
 	//~ EM5_READOUT_STOP, /* Start and stop readout */ 

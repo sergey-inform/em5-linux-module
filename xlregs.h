@@ -1,7 +1,7 @@
 #define XLBASE  	0x0C000000L
 #define XLBASE_LEN	0x10000
 
-extern ulong xlbase; // it's ioremapped in em5_embus_init
+extern ulong xlbase; // it's ioremapped in em5_xlbus_init
 extern ulong xlbase_hw; 
 
 #define _XLREG(reg)	(volatile u32 *)(xlbase + reg)
@@ -29,12 +29,11 @@ extern ulong xlbase_hw;
 #define DMA_ENA  	(1<<0)	// Enable DREQ2
 
 /* Status register */
-#define FF_EMPTY  	0x1
 #define WRCOUNT_MASK  	0x3FF
 #define WRCOUNT_SHIFT 	16
 /* fifo write count; decreases while reading fifo */
-#define WRCOUNT(stat)  (((stat) >> WRCOUNT_SHIFT ) & WRCOUNT_MASK) 
-
+#define STAT_WRCOUNT(stat)  (((stat) >> WRCOUNT_SHIFT ) & WRCOUNT_MASK) 
+#define STAT_FF_EMPTY  	0x1
 
 /* Interrupt flag register */
 #define IFR_BS		(1<<1)	// Begin-of-Spill

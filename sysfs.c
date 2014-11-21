@@ -17,6 +17,8 @@
 
 struct platform_device *pdev;
 
+extern struct spill_stats stats;
+
 //-- spill --
 
 static ssize_t spill_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -63,7 +65,7 @@ static ssize_t reset_store(struct device * dev, struct device_attribute *attr, c
 	}
 
 	if (val == 1) {
-		embus_reset();
+		xlbus_reset();
 	}
 	else {
 		return -EINVAL;
@@ -74,21 +76,27 @@ static ssize_t reset_store(struct device * dev, struct device_attribute *attr, c
 
 static DEVICE_ATTR(reset, 0644, reset_show, reset_store);
 
-//-- state --
 
-static ssize_t state_show(struct device *dev, struct device_attribute *attr, char *buf)
+//-- stats --
+
+static ssize_t stats_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%X\n", em5_current_state);
+	//TODO: wait for ES.
+	return sprintf(buf,""
+			"fifo full cnt: %d\n", 
+				atomic_read(&stats.fifo_fulls));
 }
 
-static DEVICE_ATTR(state, 0444, state_show, NULL);
+static DEVICE_ATTR(stats, 0444, stats_show, NULL);
+
+
+
 
 #ifdef PXA_MSC_CONFIG
-
 //-- xlbus --
 static ssize_t xlbus_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%X\n", embus_msc_get());
+	return sprintf(buf, "%X\n", xlbus_msc_get());
 }
 
 static ssize_t xlbus_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
@@ -102,7 +110,7 @@ static ssize_t xlbus_store(struct device * dev, struct device_attribute *attr, c
 		pr_err("two bytes!");
 		return -EINVAL;
 	}
-	embus_msc_set((unsigned)val);
+	xlbus_msc_set((unsigned)val);
 
 	return n;
 }
@@ -115,7 +123,7 @@ static DEVICE_ATTR(xlbus, 0660, xlbus_show, xlbus_store);
 
 static struct attribute *dev_attrs[] = {
 	&dev_attr_spill.attr,
-	&dev_attr_state.attr,
+	&dev_attr_stats.attr,
 	&dev_attr_reset.attr,
 #ifdef PXA_MSC_CONFIG
 	&dev_attr_xlbus.attr,

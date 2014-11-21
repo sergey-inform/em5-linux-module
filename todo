@@ -1,5 +1,8 @@
 * add module parameter "debug"
 
+!!! create_workqueue -> alloc_workqueue
+
+
 http://cliparser.sourceforge.net/
 https://github.com/dparrish/libcli
 http://clish.sourceforge.net/clish-0.7.3/index.html

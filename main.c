@@ -11,7 +11,7 @@
 
 #include "debugfs.h"
 #include "xlbus.h"
-#include "irq.h"
+#include "readout.h"
 #include "charfile.h"
 #include "sysfs.h"
 #include "em5.h"
@@ -22,13 +22,18 @@ static uint param_major = EM5_MAJOR;
 module_param_named( major, param_major, uint , S_IRUGO);
 MODULE_PARM_DESC( major, "device file major number.");
 	
-static uint param_buf_sz_mb = 1; // in megabytes
+static uint param_buf_sz_mb = 1; // megabytes
 module_param_named( mem, param_buf_sz_mb, uint, S_IRUGO);
 MODULE_PARM_DESC( mem, "readout bufer size (in megabytes).");
-	
-uint param_irq_delay = 100;
-module_param_named( irq_delay, param_irq_delay, uint, S_IRUGO);
-MODULE_PARM_DESC( irq_delay, "");
+
+bool param_dma_ena = 0; // can be changed in runtime
+module_param_named( dma, param_dma_ena, bool, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC( dma, "readout with DMA controller.");
+
+uint param_spill_latency = 1000; // ms
+module_param_named( spill_latency, param_spill_latency, uint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC( spill_latency, "How long the readout lasts after the end of spill.");
+
 
 //~ #undef DEBUG 
 
@@ -44,11 +49,11 @@ static void em5_cleanup(void)
 	em5_sysfs_free();
 	em5_charfile_free(); 
 	em5_debugfs_free();
-	em5_irq_free();
-	em5_embus_free();
+	em5_readout_free();
+	em5_xlbus_free();
 	
 #ifdef CONFIG_HAS_DMA
-	em5_dma_free();
+	//~ em5_dma_free();
 #endif 
 	em5_buf_free(&buf);
 	return;
@@ -62,11 +67,11 @@ static int __init em5_init(void)
 	if(
 		// the order is important!
 		(err = em5_buf_init(&buf, param_buf_sz_mb * 1024 * 1024) ) ||
-		(err = em5_embus_init() ) || 
+		(err = em5_xlbus_init() ) || 
 #ifdef CONFIG_HAS_DMA
-		(err = em5_dma_init(&buf)) ||
+		//~ (err = em5_dma_init(&buf)) ||
 #endif 
-		(err = em5_irq_init() ) ||
+		(err = em5_readout_init() ) ||
 		(err = em5_debugfs_init() ) || 
 		(err = em5_charfile_init( param_major, 0 /*minor*/ ) ) ||
 		(err = em5_sysfs_init()) ||
@@ -78,8 +83,6 @@ static int __init em5_init(void)
 	}
 	
 	pr_info( MODULE_NAME " has been loaded.\n" );
-	*XLREG_CTRL |= BS_ENA;
-	*XLREG_CTRL |= ES_ENA;
 	return err;
 }
 
@@ -97,6 +100,6 @@ module_exit(em5_exit);
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("EM5 readout and control.");
 MODULE_AUTHOR("Sergey Ryzhikov <sergey-inform@ya.ru> IHEP-Protvino");
-MODULE_VERSION("2.0");
+MODULE_VERSION("3.0");
 
 // END FILE

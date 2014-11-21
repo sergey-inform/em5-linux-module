@@ -93,7 +93,7 @@ static long em5_fop_ioctl (struct file * fd, unsigned int ctl, unsigned long add
 	
 	/* EM-BUS ioctls: */
 	if (_IOC_NR(ctl) < EM5_CMD_MAXNR) {
-		return embus_do( _IOC_NR(ctl), NULL, /*size*/ 0);
+		return xlbus_do( _IOC_NR(ctl), NULL, /*size*/ 0);
 	}
 	
 	/* put data */

@@ -29,7 +29,7 @@ ulong mscbase = 0;
 ulong mscbase_hw = 0;
 #endif
 
-int embus_do(em5_cmd cmd, void* kaddr, size_t sz) {
+int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	
 	//check_size
 	
@@ -46,7 +46,7 @@ int embus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	return 0;
 }
 
-void embus_reset() {
+void xlbus_reset() {
 	gpio_set_value(gpio_nRST, 0);
 	udelay(1);
 	gpio_set_value(gpio_nRST, 1);
@@ -55,14 +55,14 @@ void embus_reset() {
 
 #ifdef PXA_MSC_CONFIG
 
-unsigned embus_msc_get(void)
+unsigned xlbus_msc_get(void)
 {
 	unsigned val = ioread32((void*)(mscbase + MSC1_OFF));
 	//get cs3 (left 16 bits)
 	return (val >> 16);
 }
 
-void embus_msc_set(unsigned val)
+void xlbus_msc_set(unsigned val)
 {
 	int addr = mscbase + MSC1_OFF;
 	unsigned new, old =  ioread32((void*)addr);
@@ -74,7 +74,7 @@ void embus_msc_set(unsigned val)
 
 #endif
 
-int __init em5_embus_init() 
+int __init em5_xlbus_init() 
 {
 	if ( !request_mem_region( XLBASE, XLBASE_LEN, MODULE_NAME) ) {
 		pr_err( "can't get I/O mem address 0x%lx!", XLBASE);
@@ -83,7 +83,6 @@ int __init em5_embus_init()
 	
 	xlbase_hw = XLBASE;
 	xlbase = (unsigned long )ioremap_nocache( xlbase_hw, XLBASE_LEN);
-	
 	if ( !xlbase) {
 		pr_err( "%lx ioremap failed!", xlbase_hw);
 		return -ENOMEM;
@@ -112,7 +111,7 @@ int __init em5_embus_init()
 	return 0;
 }
 
-void em5_embus_free()
+void em5_xlbus_free()
 {
 	if (xlbase_hw && xlbase) { // request_mem_region and ioremap was done
 		iounmap( (void __iomem *) xlbase ); 
