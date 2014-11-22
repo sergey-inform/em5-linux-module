@@ -20,9 +20,8 @@ static struct cdev * c_dev = {0};
 DECLARE_WAIT_QUEUE_HEAD(openq);
 struct pid * pid_reader = NULL; //TODO: make a list of readers
 
+extern volatile enum {STOPPED, PENDING, RUNNING, DREADY} readout_state;
 extern struct em5_buf buf;
-extern em5_state em5_current_state;
-
 
 static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 {
@@ -136,13 +135,12 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 		return -EBUSY;
 	}
 	
-	if (wait_event_interruptible(openq, em5_current_state & EM5_STATE_DREADY) )
+	if (wait_event_interruptible(openq, readout_state==DREADY) )
 		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 	
 	pid_reader = get_task_pid(current, PIDTYPE_PID);
 	
 	//: unlock semaphore
-	em5_current_state &= ~EM5_STATE_DREADY; // unset bit
 	pr_devel("file open,  PID: %d\n", pid_nr(pid_reader));
 	return 0;
 }
@@ -155,12 +153,18 @@ static int em5_fop_release (struct inode *inode, struct file *filp)
 		pr_devel("file close, unset reader PID: %d\n", pid_nr(pid));
 	}
 	
+	readout_state = STOPPED;
+	
 	return 0;
 }
 
 static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count, loff_t *f_pos)
 {
 	void * rp;
+	
+	//~ if (wait_event_interruptible(openq, !(readout_state==STOPPED) ) )
+		//~ return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
+	//~ 
 	rp = (void *) (buf.vaddr + *f_pos);
 	
 	if (*f_pos > buf.count)

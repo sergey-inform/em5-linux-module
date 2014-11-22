@@ -13,15 +13,21 @@
 #include <asm/atomic.h>
 
 
+
 struct spill_stats {
-	//~ dma_bytes
-	//~ cpu_bytes
+	unsigned int bytes;
 	//~ trailing_bytes
 	atomic_t fifo_fulls;
+	//overrun t/f
 	//~ 
 };
 
-
+struct run_stats {
+	//~ total_bytes
+	//~ overrun_ctr
+	//extra dreqs
+	//...
+};
 
 //reconfigure pxa static memory for xlbus
 #define PXA_MSC_CONFIG
@@ -39,16 +45,6 @@ typedef unsigned long emword;	/* EuroMISS word: addr+data */
 int em5_set_spill(int val);
 int em5_get_spill(void);
 
-typedef enum {
-	EM5_STATE_UNINIT    	= 0b00000000,
-	EM5_STATE_BUSY    	= 0b00000001,
-	EM5_STATE_SPILL    	= 0b00000010,
-	EM5_STATE_DREADY    	= 0b00000100, //buffer is untouched
-	EM5_STATE_OVERRUN 	= 0b01000000,
-	EM5_STATE_ERROR   	= 0b10000000,
-} em5_state;
-
-
 //~ enum status_bits {
 	//~ EM5_FIFO_READOUT, //FIFO is being reading out
 	//~ EM5_DREADY, //New data in readout buffer for userspace process
@@ -62,8 +58,6 @@ typedef enum {
 /* USE asm/bitops.h for atomic aceess to status bits! */
 //~ unsigned long em5_status; //TODO: rename to state
 
-
-extern em5_state em5_current_state;
 
 
 /* Buffer (could be mmapped in userspace) */

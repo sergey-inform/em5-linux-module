@@ -33,7 +33,10 @@ extern ulong xlbase_hw;
 #define WRCOUNT_SHIFT 	16
 /* fifo write count; decreases while reading fifo */
 #define STAT_WRCOUNT(stat)  (((stat) >> WRCOUNT_SHIFT ) & WRCOUNT_MASK) 
-#define STAT_FF_EMPTY  	0x1
+#define STAT_FF_EMPTY  	(1<<0)
+#define STAT_SPILL  	(1<<1)
+#define STAT_IRQ  	(1<<2)
+#define STAT_MISS_ERR  	(1<<3)
 
 /* Interrupt flag register */
 #define IFR_BS		(1<<1)	// Begin-of-Spill

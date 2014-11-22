@@ -17,37 +17,38 @@
 
 struct platform_device *pdev;
 
-extern struct spill_stats stats;
+extern struct spill_stats sstats;
 
 //-- spill --
+//FIXME: spill->readout
 
-static ssize_t spill_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", em5_get_spill() ? 1 : 0);
-}
-
-static ssize_t spill_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
-{
-	unsigned long val;
-	
-	if( strict_strtoul(buf, /*base*/ 0, &val))
-		return -EINVAL;
-		
-	switch(val)
-	{
-	case 0:
-	case 1:
-		em5_set_spill(val);
-		break;
-	default:
-		pr_err("Spill can be 1 or 0.\n");
-		return -EINVAL;
-	}
-	
-	return n;
-}
-
-static DEVICE_ATTR(spill, 0644, spill_show, spill_store);
+//~ static ssize_t spill_show(struct device *dev, struct device_attribute *attr, char *buf)
+//~ {
+	//~ return sprintf(buf, "%d\n", em5_get_spill() ? 1 : 0);
+//~ }
+//~ 
+//~ static ssize_t spill_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
+//~ {
+	//~ unsigned long val;
+	//~ 
+	//~ if( strict_strtoul(buf, /*base*/ 0, &val))
+		//~ return -EINVAL;
+		//~ 
+	//~ switch(val)
+	//~ {
+	//~ case 0:
+	//~ case 1:
+		//~ em5_set_spill(val);
+		//~ break;
+	//~ default:
+		//~ pr_err("Spill can be 1 or 0.\n");
+		//~ return -EINVAL;
+	//~ }
+	//~ 
+	//~ return n;
+//~ }
+//~ 
+//~ static DEVICE_ATTR(spill, 0644, spill_show, spill_store);
 
 //-- reset --
 
@@ -79,17 +80,21 @@ static DEVICE_ATTR(reset, 0644, reset_show, reset_store);
 
 //-- stats --
 
-static ssize_t stats_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t sstats_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	//TODO: wait for ES.
+	//TODO: wait for readout stopped.
 	return sprintf(buf,""
 			"fifo full cnt: %d\n", 
-				atomic_read(&stats.fifo_fulls));
+				atomic_read(&sstats.fifo_fulls));
 }
+static DEVICE_ATTR(spill, 0444, sstats_show, NULL);
 
-static DEVICE_ATTR(stats, 0444, stats_show, NULL);
 
-
+static ssize_t rstats_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf,"not implemented yet");
+}
+static DEVICE_ATTR(run, 0444, rstats_show, NULL);
 
 
 #ifdef PXA_MSC_CONFIG
@@ -123,7 +128,7 @@ static DEVICE_ATTR(xlbus, 0660, xlbus_show, xlbus_store);
 
 static struct attribute *dev_attrs[] = {
 	&dev_attr_spill.attr,
-	&dev_attr_stats.attr,
+	&dev_attr_run.attr,
 	&dev_attr_reset.attr,
 #ifdef PXA_MSC_CONFIG
 	&dev_attr_xlbus.attr,

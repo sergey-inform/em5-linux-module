@@ -1,11 +1,13 @@
 #include <linux/init.h>
-#include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 
 #include <linux/ioport.h>	/* request_mem_region */
 #include <linux/io.h>	   /* ioremap, iounmap */
 //~ #include <asm/io.h>	/* ioread, iowrite */
 #include <linux/mutex.h>
+#include <linux/sched.h>
+#include <linux/slab.h> /* kmalloc */
 
 #include "mach/gpio.h"	/* gpio_set_value, gpio_get_value */
 #include <linux/delay.h>
@@ -14,6 +16,7 @@
 #include "em5.h"
 #include "xlbus.h"
 #include "xlregs.h"
+
 
 ulong xlbase = 0;
 ulong xlbase_hw = 0;
@@ -28,6 +31,80 @@ ulong xlbase_hw = 0;
 ulong mscbase = 0;
 ulong mscbase_hw = 0;
 #endif
+
+DECLARE_WAIT_QUEUE_HEAD(waitq);
+
+static struct workqueue_struct * dataloop_wq; ///workqueue for  dataloop
+
+typedef struct {
+  struct work_struct work;
+  void * addr;
+  unsigned max;
+} dataloop_work_t;
+
+dataloop_work_t * dataloop_work;
+
+static unsigned dataloop_bytes = 0;
+static volatile bool dataloop_started = 0;
+static volatile bool dataloop_finished = 1;
+
+static void _dataloop(struct work_struct *work)
+{
+	dataloop_work_t * mywork = (dataloop_work_t *) work;
+	unsigned wtrailing = 0;
+	void * addr = mywork->addr; 
+	unsigned max = mywork->max; 
+	
+	dataloop_bytes = 0;
+	dataloop_finished = 0;
+	
+	while( dataloop_started) 
+	{
+		wtrailing = STAT_WRCOUNT(ioread32(XLREG_STAT));
+		
+			// if 3f6 -> fifo_full++
+		
+		if (wtrailing + dataloop_bytes > max) { ///overrun
+			wtrailing = max - dataloop_bytes;
+			// TODO: set overrun;
+			dataloop_started = 0;
+		}
+		
+		while (wtrailing--)
+		{
+			*(u32*)(addr + dataloop_bytes) = ioread32(XLREG_DATA);
+			dataloop_bytes += sizeof(u32);
+		}
+		
+		if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
+			schedule(); ///take a nap
+		}
+	}
+	
+	
+	dataloop_bytes = dataloop_bytes;
+	dataloop_finished = 1;
+	wake_up_interruptible(&waitq);
+
+}
+
+void xlbus_dataloop_start(void * addr, unsigned max)
+{
+	dataloop_bytes = 0;
+	dataloop_started = 1;
+	dataloop_work->addr = addr;
+	dataloop_work->max  = max;
+	queue_work(dataloop_wq, (struct work_struct *)dataloop_work);
+}
+
+unsigned int xlbus_dataloop_stop(void)
+{
+	dataloop_started = 0;
+	pr_devel("wait a bit");
+	wait_event_interruptible(waitq, dataloop_finished);
+	pr_devel("= DATALOOP exit, %d\n\n", dataloop_bytes);
+	return dataloop_bytes;
+}
 
 int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	
@@ -54,7 +131,6 @@ void xlbus_reset() {
 }
 
 #ifdef PXA_MSC_CONFIG
-
 unsigned xlbus_msc_get(void)
 {
 	unsigned val = ioread32((void*)(mscbase + MSC1_OFF));
@@ -71,8 +147,21 @@ void xlbus_msc_set(unsigned val)
 	iowrite32(new, (void*)addr);
 	return;
 }
-
 #endif
+
+void xlbus_sw_ext_trig(int val) 
+/** Enable/disable the external trigger intput on front pannel. */
+{
+	//FIXME: get ctrl spinlock
+	unsigned int ctrl = ioread32(XLREG_CTRL);
+	
+	if (val)
+		iowrite32(ctrl | TRIG_ENA, XLREG_CTRL);
+	else
+		iowrite32(ctrl & ~TRIG_ENA, XLREG_CTRL);
+	
+	//FIXME: free ctrl spinlock
+}
 
 int __init em5_xlbus_init() 
 {
@@ -90,8 +179,24 @@ int __init em5_xlbus_init()
 	
 	PDEBUG("xlbase ioremapped %lx->%lx", xlbase_hw, xlbase);
 	
-#ifdef PXA_MSC_CONFIG
 	
+	/// Readout work (for readout with CPU):
+	dataloop_wq = create_singlethread_workqueue("dataloop_queue");
+	if (!dataloop_wq) {
+		pr_err("xlbus: failed to create workqueue.");
+		return -EFAULT;
+	}
+	
+	dataloop_work = (dataloop_work_t *)kmalloc(sizeof(dataloop_work_t), GFP_KERNEL);
+	if (!dataloop_work) {
+		pr_err("xlbus: kmalloc dataloop_work.");
+		return -ENOMEM;
+	}
+
+	INIT_WORK( (struct work_struct *)dataloop_work, _dataloop );
+	
+	
+	#ifdef PXA_MSC_CONFIG
 	if ( !request_mem_region( PXA_MSC_BASE, PXA_MSC_LEN, MODULE_NAME) ) {
 		pr_err( "can't get I/O mem address 0x%lx!", mscbase_hw);
 		return -ENODEV;
@@ -106,13 +211,26 @@ int __init em5_xlbus_init()
 	}
 	
 	PDEBUG("pxa-msc conrol registers ioremapped %lx->%lx", mscbase, mscbase);
-#endif
+	#endif
+	
 	
 	return 0;
 }
 
 void em5_xlbus_free()
 {
+	dataloop_started = 0; //fast fix
+	
+	if (dataloop_wq) {
+		flush_workqueue( dataloop_wq );
+		destroy_workqueue( dataloop_wq );
+	}
+	
+	if (dataloop_work) {
+		kfree(dataloop_work);
+	}
+
+	
 	if (xlbase_hw && xlbase) { // request_mem_region and ioremap was done
 		iounmap( (void __iomem *) xlbase ); 
 	}
@@ -121,14 +239,14 @@ void em5_xlbus_free()
 		release_mem_region(xlbase_hw, XLBASE_LEN);
 	}
 	
-#ifdef PXA_MSC_CONFIG
+	#ifdef PXA_MSC_CONFIG
 	if (mscbase_hw && mscbase) { // request_mem_region and ioremap was done
 		iounmap( (void __iomem *) mscbase ); 
 	}
 	if (mscbase_hw) {
 		release_mem_region(mscbase_hw, PXA_MSC_LEN);
 	}
-#endif
+	#endif
 
 	return;
 }
