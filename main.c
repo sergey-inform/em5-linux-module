@@ -53,7 +53,7 @@ static void em5_cleanup(void)
 	em5_xlbus_free();
 	
 #ifdef CONFIG_HAS_DMA
-	//~ em5_dma_free();
+	em5_dma_free();
 #endif 
 	em5_buf_free(&buf);
 	return;
@@ -69,7 +69,7 @@ static int __init em5_init(void)
 		(err = em5_buf_init(&buf, param_buf_sz_mb * 1024 * 1024) ) ||
 		(err = em5_xlbus_init() ) || 
 #ifdef CONFIG_HAS_DMA
-		//~ (err = em5_dma_init(&buf)) ||
+		(err = em5_dma_init(&buf)) ||
 #endif 
 		(err = em5_readout_init() ) ||
 		(err = em5_debugfs_init() ) || 

@@ -15,8 +15,9 @@
 #include "module.h"
 #include "readout.h"
 #include "xlregs.h"
-#include "dma.h"
 #include "em5.h"
+
+#include "dma.h"
 
 #include "mach/irqs.h" /* IRQ_GPIO1 */
 	
@@ -70,7 +71,7 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 void _do_bs(struct work_struct *work) 
 {
 	//TODO: if not running already
-		pr_warn("BS irq!\n");
+		pr_warn("--- \nBS irq!\n");
 		em5_readout_start();
 	//else:
 		// increment run_stats bs_while_readout
@@ -83,6 +84,7 @@ void _do_es(struct work_struct *work)
 		//TS
 		pr_warn("!ES irq\n");
 		set_current_state(TASK_INTERRUPTIBLE);
+		/// delay stop (for PED and LED events)
 		schedule_timeout( param_spill_latency * HZ / 1000 /* ms to jiffies*/); 
 		em5_readout_stop();
 	//else:
@@ -113,8 +115,7 @@ int em5_readout_start(void)
 	
 	if (param_dma_ena) {
 		readout_mode = DMA;
-		//~ dma_readout_start();
-		pr_debug("dma still enabled");
+		dma_readout_start();
 	}
 	else {
 		readout_mode = CPU;
@@ -137,7 +138,7 @@ int em5_readout_stop(void)  /// can sleep
 	readout_state = PENDING;
 	switch (readout_mode)
 	{
-		case DMA: /*cnt = dma_readout_stop()*/; break;
+		case DMA: cnt = dma_readout_stop(); break;
 		case CPU: cnt = xlbus_dataloop_stop(); break;
 	}
 	

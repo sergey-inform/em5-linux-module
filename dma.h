@@ -5,7 +5,7 @@
 
 int em5_dma_init(struct em5_buf *);
 void em5_dma_free( void);
-int em5_dma_start(void);
-u32 em5_dma_stop(void);
+int dma_readout_start(void);
+u32 dma_readout_stop(void);
 
 #endif /*EM5_dma_H*/
