@@ -142,7 +142,7 @@ u32 dma_readout_stop(void)
 
 	if (dreqs)
 		pr_devel("non-handled dreqs!!!: %d", dreqs);
-	pr_devel("after stop: DDADR %X, DTADR:%X, DCSR %X",DDADR(dma_chan), DTADR(dma_chan), DCSR(dma_chan));
+	pr_devel("after stop: DDADR %X, DTADR:%X, DCSR %X", DDADR(dma_chan), DTADR(dma_chan), DCSR(dma_chan));
 	
 	
 

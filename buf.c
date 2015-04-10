@@ -34,7 +34,7 @@ int em5_buf_mmap(struct em5_buf *buf, struct vm_area_struct *vma)
 	
 	/* make it foolproof */
 	if ( usize != bufsz ){
-		PERROR("You can't mmap a part of buffer.");
+		PERROR("You can't mmap a part of a buffer.");
 		return -EINVAL;
 	}
 	
@@ -72,7 +72,7 @@ int em5_buf_init(struct em5_buf *buf, size_t size)
 	int i;
 	unsigned int sz;
 	buf->vaddr = NULL;
-	buf->num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	buf->num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT; //round a size to PAGE_SIZE
 	
 	
 	sz = buf->num_pages * sizeof(struct page *);

@@ -14,6 +14,7 @@ extern ulong xlbase_hw;
 #define XLREG_STAT 	_XLREG(0x10)		// stat register
 #define XLREG_IFR  	_XLREG(0x14)		// IFR interrupt flag register (rw)
 #define XLREG_CTRL 	_XLREG(0x18)		// control_register (rw)
+#define XLREG_COUNTR	_XLREG(0x1C)        // events per spill and spill counters	    
 #define XLREG_APWR 	_XLREG(0x20)		// start AP write
 #define XLREG_APRD 	_XLREG(0x30)		// start AP read
 

@@ -63,7 +63,7 @@ static int __init em5_init(void)
 {
 	int err = 0;
 	
-	// init components one by one unless first error.
+	// init components one by one
 	if(
 		// the order is important!
 		(err = em5_buf_init(&buf, param_buf_sz_mb * 1024 * 1024) ) ||
