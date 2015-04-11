@@ -280,6 +280,8 @@ int em5_dma_init( struct em5_buf * buf)
 
 void em5_dma_free( void)
 {
+	dma_readout_stop();
+	
 	if (transfer.desc_list) {
 		dma_free_coherent(dev, transfer.desc_len, transfer.desc_list, transfer.hw_desc_list);
 	}

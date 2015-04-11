@@ -2,14 +2,18 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/err.h>
+#include <linux/io.h>
 
 #include <linux/platform_device.h>
 #include <linux/string.h>
 #include <asm/uaccess.h> /* copy_from_user */
 
+#include <linux/sched.h>        /* TASK_INTERRUPTIBLE */
+
 #include "module.h"
 #include "xlbus.h"
 #include "em5.h"
+#include "xlregs.h" //DELME
 
 //~ static const char ctrl_auto[] = "auto";
 //~ static const char ctrl_on[] = "on";
@@ -79,7 +83,6 @@ static DEVICE_ATTR(reset, 0644, reset_show, reset_store);
 
 
 //-- stats --
-
 static ssize_t sstats_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	//TODO: wait for readout stopped.
@@ -88,6 +91,27 @@ static ssize_t sstats_show(struct device *dev, struct device_attribute *attr, ch
 				atomic_read(&sstats.fifo_fulls));
 }
 static DEVICE_ATTR(spill, 0444, sstats_show, NULL);
+
+
+
+
+extern volatile enum {STOPPED, PENDING, RUNNING, DREADY} readout_state;
+extern wait_queue_head_t openq;
+
+//-- lock --
+static ssize_t lock_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	if (wait_event_interruptible(openq, readout_state==DREADY) )
+		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
+
+	return sprintf(buf,"%d", ioread32(XLREG_COUNTR) & 0xFFFF);
+}
+
+static DEVICE_ATTR(lock, 0444, lock_show, NULL);
+
+
+
+
 
 
 static ssize_t rstats_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -124,12 +148,15 @@ static DEVICE_ATTR(xlbus, 0660, xlbus_show, xlbus_store);
 
 #endif
 
+
+
 //------------
 
 static struct attribute *dev_attrs[] = {
 	&dev_attr_spill.attr,
 	&dev_attr_run.attr,
 	&dev_attr_reset.attr,
+	&dev_attr_lock.attr,
 #ifdef PXA_MSC_CONFIG
 	&dev_attr_xlbus.attr,
 #endif
