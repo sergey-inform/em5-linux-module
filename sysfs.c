@@ -104,7 +104,7 @@ static ssize_t lock_show(struct device *dev, struct device_attribute *attr, char
 	if (wait_event_interruptible(openq, readout_state==DREADY) )
 		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 
-	return sprintf(buf,"%d", ioread32(XLREG_COUNTR) & 0xFFFF);
+	return sprintf(buf,"%d", ioread32(XLREG_COUNTR) & 0xFFFF); // a number of events
 }
 
 static DEVICE_ATTR(lock, 0444, lock_show, NULL);
