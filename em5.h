@@ -13,18 +13,18 @@
 #include <asm/atomic.h>
 
 
+	
+	//em5_stats_clear() memset(&stats, 0, sizeof(stats));
 
 struct spill_stats {
 	unsigned int bytes;
 	//~ trailing_bytes
 	atomic_t fifo_fulls;
-	//overrun t/f
 	//~ 
 };
 
 struct run_stats {
 	//~ total_bytes
-	//~ overrun_ctr
 	//extra dreqs
 	//...
 };

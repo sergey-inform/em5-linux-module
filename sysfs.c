@@ -110,10 +110,6 @@ static ssize_t lock_show(struct device *dev, struct device_attribute *attr, char
 static DEVICE_ATTR(lock, 0444, lock_show, NULL);
 
 
-
-
-
-
 static ssize_t rstats_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf,"not implemented yet");

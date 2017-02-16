@@ -26,16 +26,11 @@ static uint param_buf_sz_mb = 1; // megabytes
 module_param_named( mem, param_buf_sz_mb, uint, S_IRUGO);
 MODULE_PARM_DESC( mem, "readout bufer size (in megabytes).");
 
-bool param_dma_ena = 0; // can be changed in runtime
+bool param_dma_ena = 1; // can be changed in runtime
 module_param_named( dma, param_dma_ena, bool, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC( dma, "readout with DMA controller.");
 
-uint param_spill_latency = 1000; // ms
-module_param_named( spill_latency, param_spill_latency, uint, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC( spill_latency, "How long the readout lasts after the end of spill.");
-
-
-//~ #undef DEBUG 
+//~ #undef DEBUG  // comment for production
 
 struct em5_buf buf = {};
 
@@ -50,7 +45,7 @@ static void em5_cleanup(void)
 	em5_charfile_free(); 
 	em5_debugfs_free();
 	em5_readout_free();
-	em5_xlbus_free();
+	em5_xlbus_free(); //TODO:  check, if it should bee freed before dma.
 	
 #ifdef CONFIG_HAS_DMA
 	em5_dma_free();
@@ -63,9 +58,9 @@ static int __init em5_init(void)
 {
 	int err = 0;
 	
-	// init components one by one
+	// Init components one by one.
+	// the order is important!
 	if(
-		// the order is important!
 		(err = em5_buf_init(&buf, param_buf_sz_mb * 1024 * 1024) ) ||
 		(err = em5_xlbus_init() ) || 
 #ifdef CONFIG_HAS_DMA
@@ -83,7 +78,8 @@ static int __init em5_init(void)
 	}
 	
 	pr_info( MODULE_NAME " has been loaded.\n" );
-	// if mode is daq, enable BS IRQ, set busy output to 0.
+	
+	// TODO:if mode is daq, enable BS IRQ, set busy output to 0.
 	return err;
 }
 
@@ -97,10 +93,8 @@ static void __exit em5_exit(void)
 module_init(em5_init);
 module_exit(em5_exit);
 	
-	
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("EM5 readout and control.");
 MODULE_AUTHOR("Sergey Ryzhikov <sergey-inform@ya.ru> IHEP-Protvino");
-MODULE_VERSION("3.0");
-
+MODULE_VERSION("17");
 // END FILE

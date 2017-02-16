@@ -32,66 +32,59 @@ ulong mscbase = 0;
 ulong mscbase_hw = 0;
 #endif
 
-DECLARE_WAIT_QUEUE_HEAD(waitq);
+DECLARE_WAIT_QUEUE_HEAD(dataloop_wq);
 
 static struct workqueue_struct * dataloop_wq; ///workqueue for  dataloop
 
 typedef struct {
-  struct work_struct work;
-  void * addr;
-  unsigned max;
-} dataloop_work_t;
+	struct work_struct work;
+	void * addr;
+	unsigned max;
+	unsigned bytes;
+	bool overflow;  // trying to reed more then max bytes
+	bool running;  // readout cycle
+	} dataloop_work_t;
 
 dataloop_work_t * dataloop_work;
 
-static unsigned dataloop_bytes = 0;
-static volatile bool dataloop_started = 0;
-static volatile bool dataloop_finished = 1;
-
 static void _dataloop(struct work_struct *work)
+/** Readout XLREG_DATA FIFO with CPU.
+ */
 {
-	dataloop_work_t * mywork = (dataloop_work_t *) work;
-	unsigned wtrailing = 0;
-	void * addr = mywork->addr; 
-	unsigned max = mywork->max; 
+	unsigned wtrailing;
+	unsigned bytes = 0;
 	
-	dataloop_bytes = 0;
-	dataloop_finished = 0;
+	work->running = TRUE;
 	
-	while( dataloop_started) 
-	{
+	do{
 		wtrailing = STAT_WRCOUNT(ioread32(XLREG_STAT));
 		
-			// if 3f6 -> fifo_full++
+			// if 3f6 -> stats_fifo_full++
 		
-		if (wtrailing + dataloop_bytes > max) { ///overrun
+		if (wtrailing + bytes > max) { ///overrun
+			work->overflow = TRUE;
 			wtrailing = max - dataloop_bytes;
-			// TODO: set overrun;
 			dataloop_started = 0;
 		}
 		
 		while (wtrailing--)
 		{
-			*(u32*)(addr + dataloop_bytes) = ioread32(XLREG_DATA);
-			dataloop_bytes += sizeof(u32);
+			*(u32*)(addr + bytes) = ioread32(XLREG_DATA);
+			bytes += sizeof(u32);
 		}
 		
 		if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
 			schedule(); ///take a nap
 		}
-	}
 	
-	
-	dataloop_bytes = dataloop_bytes;
-	dataloop_finished = 1;
-	wake_up_interruptible(&waitq);
+	work->bytes = bytes;
+	} while (work->running)
 
+	wake_up_interruptible(&dataloop_wq);
 }
 
-void xlbus_dataloop_start(void * addr, unsigned max)
+void xlbus_dataloop_start(void * addr, unsigned max /* buffer length */)
 {
-	dataloop_bytes = 0;
-	dataloop_started = 1;
 	dataloop_work->addr = addr;
 	dataloop_work->max  = max;
 	queue_work(dataloop_wq, (struct work_struct *)dataloop_work);
@@ -99,12 +92,23 @@ void xlbus_dataloop_start(void * addr, unsigned max)
 
 unsigned int xlbus_dataloop_stop(void)
 {
-	dataloop_started = 0;
-	pr_devel("wait a bit");
-	wait_event_interruptible(waitq, dataloop_finished);
+	dataloop_work->running = FALSE;
+	
+	PDEBUG("stopping dataloop");
+	wait_event_interruptible(dataloop_wq, dataloop_finished);
 	pr_devel("= DATALOOP exit, %d\n\n", dataloop_bytes);
 	return dataloop_bytes;
 }
+
+
+
+
+:TODO
+* dataloop start/stop
+* queue (queue_newdata, queue_spill)
+* sysfs
+* status (debugfs?)
+
 
 int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	
@@ -219,7 +223,7 @@ int __init em5_xlbus_init()
 
 void em5_xlbus_free()
 {
-	dataloop_started = 0; //fast fix
+	dataloop_work->running = 0;
 	
 	if (dataloop_wq) {
 		flush_workqueue( dataloop_wq );
