@@ -51,20 +51,17 @@ static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
  */
 {
-	unsigned wtrailing;
-	unsigned bytes = 0;
-	
-	work->running = TRUE;
+	unsigned bcount = 0;
+	work->bytes = 0;
+	work->running = TRUE;  ///start
 	
 	do{
-		wtrailing = STAT_WRCOUNT(ioread32(XLREG_STAT));
+		// if 3f6 -> stats_fifo_full++
 		
-			// if 3f6 -> stats_fifo_full++
-		
-		if (wtrailing + bytes > max) { ///overrun
-			work->overflow = TRUE;
-			wtrailing = max - dataloop_bytes;
-			dataloop_started = 0;
+		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
+			
+		if (wcount * sizeof(u32) + bcount > max) {
+			wcount = (max - bcount)/4;
 		}
 		
 		while (wtrailing--)
@@ -73,11 +70,17 @@ static void _dataloop(struct work_struct *work)
 			bytes += sizeof(u32);
 		}
 		
-		if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
-			schedule(); ///take a nap
+		if (bcount == max) {
+			work->running = FALSE;
+			work->overflow = TRUE;
 		}
-	
-	work->bytes = bytes;
+		
+		work->bytes = bytes;
+		
+		if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
+			schedule();  ///take a nap
+		}
+		
 	} while (work->running)
 
 	wake_up_interruptible(&dataloop_wq);
@@ -93,11 +96,12 @@ void xlbus_dataloop_start(void * addr, unsigned max /* buffer length */)
 unsigned int xlbus_dataloop_stop(void)
 {
 	dataloop_work->running = FALSE;
-	
 	PDEBUG("stopping dataloop");
-	wait_event_interruptible(dataloop_wq, dataloop_finished);
-	pr_devel("= DATALOOP exit, %d\n\n", dataloop_bytes);
-	return dataloop_bytes;
+	
+	wait_event_interruptible(dataloop_wq, dataloop_work->bytes);
+	PDEBUG("= DATALOOP exit, %d\n\n", data);
+	
+	return dataloop_work->bytes;
 }
 
 
