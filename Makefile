@@ -1,5 +1,7 @@
 # Comment/uncomment the following line to enable/disable debugging
 DEBUG = y
+#~ DMA_READOUT = y
+
 INSTALLDIR1 :=/home/user/em5_rootfs_overlay/opt/
 INSTALLDIR2 :=/home/user/nfsroot/root/
 
@@ -24,17 +26,21 @@ else
   DEBFLAGS = -O2
 endif
 
-ccflags-$(DEBUG) += $(DEBFLAGS)	
+ifeq ($(DMA_READOUT),y)
+  ccflags-$(DMA_READOUT) += -DDMA_READOUT
+endif
+  
+ccflags-$(DEBUG) += $(DEBFLAGS)
 
 # If KERNELRELEASE is defined, we've been invoked from the
-# kernel build system and can use its language.
+# kernel build system (and can use its language).
 ifneq ($(KERNELRELEASE),)
 	obj-m += $(TARGET).o
 	$(TARGET)-objs := main.o buf.o xlbus.o  readout.o charfile.o sysfs.o
 	$(TARGET)-$(CONFIG_DEBUG_FS) += debugfs.o
-	$(TARGET)-$(CONFIG_HAS_DMA) += dma-pxa270.o
+	$(TARGET)-$(DMA_READOUT) += dma-pxa270.o
 	
-# Otherwise we were called directly. Invoke the kernel build system.
+# Otherwise we were called directly (normal way). Invoke the kernel build system.
 else
 	PWD := $(shell pwd)
 	

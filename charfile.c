@@ -5,9 +5,9 @@
 
 #include <linux/cdev.h>
 #include <linux/fs.h>
-#include <linux/mm.h> /* vma */
-#include <asm/uaccess.h> /* access_ok */
-#include <linux/sched.h>        /* TASK_INTERRUPTIBLE */
+#include <linux/mm.h>  /* vma */
+#include <asm/uaccess.h>  /* access_ok */
+#include <linux/sched.h>  /* TASK_INTERRUPTIBLE */
 
 #include "module.h"
 #include "charfile.h"
@@ -20,7 +20,7 @@ static struct cdev * c_dev = {0};
 DECLARE_WAIT_QUEUE_HEAD(openq);
 struct pid * pid_reader = NULL; //TODO: make a list of readers
 
-extern volatile enum {STOPPED, PENDING, RUNNING, DREADY} readout_state;
+extern volatile enum {STOPPED, PENDING, RUNNING, COMPLETE} readout_state;
 extern struct em5_buf buf;
 
 static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
@@ -135,7 +135,7 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 		return -EBUSY;
 	}
 	
-	if (wait_event_interruptible(openq, readout_state==DREADY) )
+	if (wait_event_interruptible(openq, readout_state==COMPLETE) )
 		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 	
 	pid_reader = get_task_pid(current, PIDTYPE_PID);

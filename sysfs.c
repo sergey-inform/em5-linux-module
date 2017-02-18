@@ -15,9 +15,6 @@
 #include "em5.h"
 #include "xlregs.h" //DELME
 
-//~ static const char ctrl_auto[] = "auto";
-//~ static const char ctrl_on[] = "on";
-
 
 struct platform_device *pdev;
 
@@ -95,13 +92,13 @@ static DEVICE_ATTR(spill, 0444, sstats_show, NULL);
 
 
 
-extern volatile enum {STOPPED, PENDING, RUNNING, DREADY} readout_state;
+extern volatile enum {STOPPED, PENDING, RUNNING, COMPLETE} readout_state;
 extern wait_queue_head_t openq;
 
 //-- lock --
 static ssize_t lock_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	if (wait_event_interruptible(openq, readout_state==DREADY) )
+	if (wait_event_interruptible(openq, readout_state==COMPLETE) )
 		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 
 	return sprintf(buf,"%d", ioread32(XLREG_COUNTR) & 0xFFFF); // a number of events

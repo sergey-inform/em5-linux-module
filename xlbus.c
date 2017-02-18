@@ -32,82 +32,100 @@ ulong mscbase = 0;
 ulong mscbase_hw = 0;
 #endif
 
-DECLARE_WAIT_QUEUE_HEAD(dataloop_wq);
-
-static struct workqueue_struct * dataloop_wq; ///workqueue for  dataloop
+DECLARE_WAIT_QUEUE_HEAD(dataloop_wait);  /// wait queue
+static struct workqueue_struct * dataloop_wq;  /// workqueue for dataloop
 
 typedef struct {
 	struct work_struct work;
 	void * addr;
 	unsigned max;
 	unsigned bytes;
+	bool started; 
+	bool running;  // readout is actually going on
 	bool overflow;  // trying to reed more then max bytes
-	bool running;  // readout cycle
 	} dataloop_work_t;
 
 dataloop_work_t * dataloop_work;
+
 
 static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
  */
 {
-	unsigned wtrailing;
-	unsigned bytes = 0;
+	dataloop_work_t * dwork = (dataloop_work_t *) work;
 	
-	work->running = TRUE;
+	unsigned wcount;
+	unsigned words = 0;  //counter
+	unsigned * addr = (u32*)dwork->addr;
+	unsigned wmax = dwork->max * sizeof(u32);
 	
-	do{
-		wtrailing = STAT_WRCOUNT(ioread32(XLREG_STAT));
+	dwork->running = TRUE;
+	
+	while (dwork->started)
+	{
+		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
+		// if 3f6 -> stats_fifo_full++  /// count fifo full events
 		
-			// if 3f6 -> stats_fifo_full++
-		
-		if (wtrailing + bytes > max) { ///overrun
-			work->overflow = TRUE;
-			wtrailing = max - dataloop_bytes;
-			dataloop_started = 0;
+		if (words + wcount > wmax) {  /// overflow
+			wcount = wmax - words;
+			dwork->overflow = TRUE;
 		}
 		
-		while (wtrailing--)
+		while (wcount--)
 		{
-			*(u32*)(addr + bytes) = ioread32(XLREG_DATA);
-			bytes += sizeof(u32);
+			*(addr + words) = ioread32(XLREG_DATA);
+			words++;
 		}
+
+		dwork->bytes = words * sizeof(u32);
+		
+		if (words >= wmax) break;  /// overflow
 		
 		if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
 			schedule(); ///take a nap
 		}
+	}
 	
-	work->bytes = bytes;
-	} while (work->running)
+	dwork->running = FALSE;
 
-	wake_up_interruptible(&dataloop_wq);
+	wake_up_interruptible(&dataloop_wait);
 }
+
 
 void xlbus_dataloop_start(void * addr, unsigned max /* buffer length */)
 {
+	if (dataloop_work->started || dataloop_work->running) {
+		PERROR("trying to start readout loop while already started ");
+		return;
+	}
+	
+	memset(&dataloop_work, 0, sizeof(dataloop_work));  ///clear
 	dataloop_work->addr = addr;
 	dataloop_work->max  = max;
+	dataloop_work->started = TRUE;
+
 	queue_work(dataloop_wq, (struct work_struct *)dataloop_work);
 }
 
+
 unsigned int xlbus_dataloop_stop(void)
 {
-	dataloop_work->running = FALSE;
+	unsigned int bytes;
 	
-	PDEBUG("stopping dataloop");
-	wait_event_interruptible(dataloop_wq, dataloop_finished);
-	pr_devel("= DATALOOP exit, %d\n\n", dataloop_bytes);
-	return dataloop_bytes;
+	if (dataloop_work->running == FALSE) {
+		PWARNING("trying to stop fifo readout loop while not running");
+		return 0;
+	}
+	
+	dataloop_work->started = FALSE;
+	PDEBUG("stopping fifo readout");
+
+	wait_event_interruptible(dataloop_wait, !dataloop_work->running);
+	bytes = dataloop_work->bytes;
+	pr_devel("bytes = %d\n\n", bytes);
+	
+	return bytes;
 }
-
-
-
-
-:TODO
-* dataloop start/stop
-* queue (queue_newdata, queue_spill)
-* sysfs
-* status (debugfs?)
 
 
 int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
@@ -143,6 +161,8 @@ unsigned xlbus_msc_get(void)
 }
 
 void xlbus_msc_set(unsigned val)
+/** ChipSelect-2 settings for fpga bus.
+ */
 {
 	int addr = mscbase + MSC1_OFF;
 	unsigned new, old =  ioread32((void*)addr);
@@ -196,8 +216,9 @@ int __init em5_xlbus_init()
 		pr_err("xlbus: kmalloc dataloop_work.");
 		return -ENOMEM;
 	}
-
+	
 	INIT_WORK( (struct work_struct *)dataloop_work, _dataloop );
+
 	
 	
 	#ifdef PXA_MSC_CONFIG
@@ -233,7 +254,6 @@ void em5_xlbus_free()
 	if (dataloop_work) {
 		kfree(dataloop_work);
 	}
-
 	
 	if (xlbase_hw && xlbase) { // request_mem_region and ioremap was done
 		iounmap( (void __iomem *) xlbase ); 

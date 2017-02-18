@@ -19,7 +19,6 @@ extern ulong xlbase_hw;
 #define XLREG_APRD 	 _XLREG(0x30)		// start AP read
 
 
-
 /* Control register bits*/
 #define TRIG_ENA  	(1<<6)	// Enable pchi by front panel input
 #define PROG_BUSY  	(1<<5)	// Set busy output

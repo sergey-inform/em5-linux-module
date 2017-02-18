@@ -13,52 +13,37 @@
 #include <asm/atomic.h>
 
 
-	
-	//em5_stats_clear() memset(&stats, 0, sizeof(stats));
-
 struct spill_stats {
 	unsigned int bytes;
-	//~ trailing_bytes
 	atomic_t fifo_fulls;
-	//~ 
 };
 
 struct run_stats {
 	//~ total_bytes
 	//extra dreqs
-	//...
 };
-
-//reconfigure pxa static memory for xlbus
-#define PXA_MSC_CONFIG
 
 typedef unsigned long emword;	/* EuroMISS word: addr+data */
 
-#define EM5_MAGIC	0x62356d65	/*the chosen bit pattern*/ 
+
+
+/**
+ *  Device magic number for IOCTLs.
+ */
+#define EM5_MAGIC	0x62356d65
+
 
 #define EMWORD_SZ  (sizeof(emword))
 #define EMWORD_MASK  (EMWORD_SZ - 1)
+
+
+//-------------------------------------------------------------------------------------
 //~ #define b2w(n)	((n) / EMWORD_SZ) /*bytes to words*/
 //~ #define w2b(n)	((n) * EMWORD_SZ) /*words to bytes*/
 
 
-int em5_set_spill(int val);
-int em5_get_spill(void);
-
-//~ enum status_bits {
-	//~ EM5_FIFO_READOUT, //FIFO is being reading out
-	//~ EM5_DREADY, //New data in readout buffer for userspace process
-	//~ EM5_OVERRUN, //
-//~ };
-//~ 
-//~ enum spill_bits {
-	//~ 
-//~ };
-
 /* USE asm/bitops.h for atomic aceess to status bits! */
 //~ unsigned long em5_status; //TODO: rename to state
-
-
 
 /* Buffer (could be mmapped in userspace) */
 //~ struct em5_buff_hdr {

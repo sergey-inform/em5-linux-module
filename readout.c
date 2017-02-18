@@ -30,24 +30,36 @@ extern struct em5_buf buf;
 extern wait_queue_head_t openq;
 extern struct pid * pid_reader; 
 
-enum {CPU, DMA} readout_mode;  
+enum {CPU, DMA} readout_mode;
+unsigned int spill_id;  /* spill number, autoincrements on BS */
 
 volatile enum {
 		STOPPED,  // after init
 		READOUT,  // FIFO readout
 		PENDING,  // between EndSpill and FIFOEmpty
-		DREADY,     // data ready
+		COMPLETE,   // data ready, time for Peds, Leds, etc.
 		} readout_state = STOPPED;
 	
 extern ulong xlbase; /** note: here we use it as dev_id (a cookie for callbacks)
 			since this address belongs to our driver. */
 
-extern bool param_dma_ena;
+extern bool param_dma_readout;
 
 static struct workqueue_struct * irq_wq; ///workqueue for irq bootom half (for BS/ES events)
+
 struct work_struct work_bs, work_es;
-void _do_work_bs(struct work_struct *);
-void _do_work_es(struct work_struct *);
+
+void _do_work_bs(struct work_struct *work) 
+{
+	PDEVEL("--- \nBS! \n");
+	readout_start();
+}
+
+void _do_work_es(struct work_struct *work)
+{
+	PDEVEL("ES! \n");
+	readout_stop();
+}
 
 irqreturn_t _irq_handler(int irq, void * dev_id)
 /** Interrupt handler.
@@ -60,7 +72,7 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	if (flags & IFR_BS) {
 		switch(readout_state) {
 			case STOPPED:
-			case DREADY:
+			case COMPLETE:
 				queue_work( irq_wq, (struct work_struct *)&work_bs );
 				break;
 			default:
@@ -90,19 +102,9 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	return IRQ_HANDLED;
 }
 
-void _do_work_bs(struct work_struct *work) 
-{
-	PDEVEL("--- \nBS!\n");
-	em5_readout_start();
-}
 
-void _do_work_es(struct work_struct *work)
-{
-	PDEVEL("ES!\n");
-	em5_readout_stop();
-}
 
-int em5_readout_start(void)
+int readout_start(void)
 /** Begin FIFO readout.
  */
 {
@@ -119,13 +121,13 @@ int em5_readout_start(void)
 		kill_err = send_sig(SIGUSR1, reader, 0 /*priv*/ );
 	}
 	if (kill_err) {
-		PWARNING("sending signal active reader failed, PID: %d",
+		PWARNING("sending signal active reader failed, PID: %d ",
 			pid_nr(pid_reader));
 	}
 
 	buf.count = 0;  ///reset buffer
 	
-	if (param_dma_ena) {
+	if (param_dma_readout) {
 		readout_mode = DMA;
 		dma_readout_start();
 	}
@@ -141,7 +143,7 @@ int em5_readout_start(void)
 }
 
 
-int em5_readout_stop(void)  /// can sleep
+int readout_stop(void)  /// can sleep
 /** Finish FIFO readout.
  * 
  */
@@ -157,7 +159,7 @@ int em5_readout_stop(void)  /// can sleep
 	
 	buf.count = cnt;
 	
-	readout_state = DREADY;
+	readout_state = COMPLETE;
 	wake_up_interruptible(&openq);  /// wake up queue_newdata
 	return 0;
 }
@@ -169,7 +171,7 @@ int em5_readout_init()
 	unsigned int flags;
 	callback_id = (void *)xlbase;
 	
-	irq_wq = alloc_ordered_workqueue("spill_queue", /*flags*/ 0);
+	irq_wq = alloc_ordered_workqueue("irq queue", /*flags*/ 0);
 	if (!irq_wq) {
 		pr_err("Failed to create workqueue.");
 		return -EFAULT;

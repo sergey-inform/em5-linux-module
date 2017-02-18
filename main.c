@@ -7,7 +7,7 @@
 
 #include "module.h"
 #include "buf.h"
-#include "dma.h"
+
 
 #include "debugfs.h"
 #include "xlbus.h"
@@ -16,6 +16,9 @@
 #include "sysfs.h"
 #include "em5.h"
 #include "xlregs.h" //FIXME: delme
+#include "dma.h"
+ 
+//~ #undef DEBUG  // uncomment for production
  
 /* Module parameters */
 static uint param_major = EM5_MAJOR;
@@ -26,11 +29,13 @@ static uint param_buf_sz_mb = 1; // megabytes
 module_param_named( mem, param_buf_sz_mb, uint, S_IRUGO);
 MODULE_PARM_DESC( mem, "readout bufer size (in megabytes).");
 
-bool param_dma_ena = 1; // can be changed in runtime
-module_param_named( dma, param_dma_ena, bool, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC( dma, "readout with DMA controller.");
-
-//~ #undef DEBUG  // comment for production
+#ifdef DMA_READOUT
+	bool param_dma_readout = 1; // can be changed in runtime
+	module_param_named( dma, param_dma_readout, bool, S_IRUGO|S_IWUSR);
+	MODULE_PARM_DESC( dma, "enable readout with DMA controller.");
+#else
+	bool param_dma_readout = 0;
+#endif 
 
 struct em5_buf buf = {};
 
@@ -46,14 +51,11 @@ static void em5_cleanup(void)
 	em5_debugfs_free();
 	em5_readout_free();
 	em5_xlbus_free(); //TODO:  check, if it should bee freed before dma.
-	
-#ifdef CONFIG_HAS_DMA
 	em5_dma_free();
-#endif 
 	em5_buf_free(&buf);
 	return;
 }
-	
+
 static int __init em5_init(void)
 {
 	int err = 0;
@@ -63,9 +65,7 @@ static int __init em5_init(void)
 	if(
 		(err = em5_buf_init(&buf, param_buf_sz_mb * 1024 * 1024) ) ||
 		(err = em5_xlbus_init() ) || 
-#ifdef CONFIG_HAS_DMA
 		(err = em5_dma_init(&buf)) ||
-#endif 
 		(err = em5_readout_init() ) ||
 		(err = em5_debugfs_init() ) || 
 		(err = em5_charfile_init( param_major, 0 /*minor*/ ) ) ||
