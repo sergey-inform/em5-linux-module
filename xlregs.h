@@ -31,7 +31,7 @@ extern ulong xlbase_hw;
 /* Status register */
 #define WRCOUNT_MASK  	0x3FF
 #define WRCOUNT_SHIFT 	16
-/* fifo write count; decreases while reading fifo */
+/* fifo write count (words?); decreases while reading fifo */
 #define STAT_WRCOUNT(stat)  (((stat) >> WRCOUNT_SHIFT ) & WRCOUNT_MASK) 
 #define STAT_FF_EMPTY  	(1<<0)
 #define STAT_SPILL  	(1<<1)
