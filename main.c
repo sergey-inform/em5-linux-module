@@ -25,7 +25,7 @@ static uint param_major = EM5_MAJOR;
 module_param_named( major, param_major, uint , S_IRUGO);
 MODULE_PARM_DESC( major, "device file major number.");
 	
-static uint param_buf_sz_mb = 1; // megabytes
+static uint param_buf_sz_mb = 10; // megabytes
 module_param_named( mem, param_buf_sz_mb, uint, S_IRUGO);
 MODULE_PARM_DESC( mem, "readout bufer size (in megabytes).");
 

@@ -50,10 +50,11 @@ default:
 endif
 
 install: $(TARGET).ko
-	install -d $(INSTALLDIR1)
-	install -d $(INSTALLDIR2)
-	install -c $(TARGET).ko $(INSTALLDIR1)
-	install -c $(TARGET).ko $(INSTALLDIR2)
+	scp -P 2223 $(TARGET).ko root@10.0.2.2:/root/ 
+#	install -d $(INSTALLDIR1)
+#	install -d $(INSTALLDIR2)
+#	install -c $(TARGET).ko $(INSTALLDIR1)
+#	install -c $(TARGET).ko $(INSTALLDIR2)
 
 clean:
 	$(MAKEARCH) -C $(KERNELDIR) M=$(PWD) clean

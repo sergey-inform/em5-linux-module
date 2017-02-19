@@ -27,7 +27,7 @@ int __init em5_debugfs_init()
 		{ "pchn", XLREG_PCHN },
 		{ "ifr" , XLREG_IFR  },
 		{ "ctrl", XLREG_CTRL },
-		{ "cntr", XLREG_COUNTR }, //FIXME: { "count", XLREG_COUNTR },
+		{ "count", XLREG_COUNTR },
 		{ "apwr", XLREG_APWR },
 		{ "aprd", XLREG_APRD },
 	};
