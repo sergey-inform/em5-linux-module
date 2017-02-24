@@ -30,24 +30,22 @@ extern struct em5_buf buf;
 extern wait_queue_head_t openq;
 extern struct pid * pid_reader; 
 
-enum {CPU, DMA} readout_mode;
-unsigned int spill_id;  /* spill number, autoincrements on BS */
+enum {CPU, DMA} readout_mode = CPU;
+unsigned int spill_id;  /* global spill number */
 
-volatile enum {
-		STOPPED,  // after init
-		READOUT,  // FIFO readout
-		PENDING,  // between EndSpill and FIFOEmpty
-		COMPLETE,   // data ready, time for Peds, Leds, etc.
-		} readout_state = STOPPED;
-	
+volatile READOUT_STATE readout_state = STOPPED;
+
+extern bool param_dma_readout;
 extern ulong xlbase; /** note: here we use it as dev_id (a cookie for callbacks)
 			since this address belongs to our driver. */
 
-extern bool param_dma_readout;
-
 static struct workqueue_struct * irq_wq; ///workqueue for irq bootom half (for BS/ES events)
-
 struct work_struct work_bs, work_es;
+
+static const char * readout_state_strings[] = {READOUT_STATE_STRINGS};
+const char * readout_state_str( void) {
+	return readout_state_strings[readout_state];
+}
 
 void _do_work_bs(struct work_struct *work) 
 {
@@ -102,28 +100,30 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	return IRQ_HANDLED;
 }
 
-
-
 int readout_start(void)
 /** Begin FIFO readout.
  */
 {
+	
+	//TODO: add mutex
+	
+	
 	int ret = 0;
-	int kill_err = 0;
-	struct task_struct * reader;
+	//~ int kill_err = 0;
+	//~ struct task_struct * reader;
 	
 	readout_state = READOUT;
 
-	if (pid_reader != NULL) {
-		/* Send signal to an active reader 
-		 * (a process which mmapped the memory buffer) */
-		reader = pid_task(pid_reader, PIDTYPE_PID);
-		kill_err = send_sig(SIGUSR1, reader, 0 /*priv*/ );
-	}
-	if (kill_err) {
-		PWARNING("sending signal active reader failed, PID: %d ",
-			pid_nr(pid_reader));
-	}
+	//~ if (pid_reader != NULL) {
+		//~ /* Send signal to an active reader 
+		 //~ * (a process which mmapped the memory buffer) */
+		//~ reader = pid_task(pid_reader, PIDTYPE_PID);
+		//~ kill_err = send_sig(SIGUSR1, reader, 0 /*priv*/ );
+	//~ }
+	//~ if (kill_err) {
+		//~ PWARNING("sending signal active reader failed, PID: %d ",
+			//~ pid_nr(pid_reader));
+	//~ }
 
 	buf.count = 0;  ///reset buffer
 	

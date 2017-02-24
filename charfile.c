@@ -14,13 +14,15 @@
 #include "buf.h"
 #include "em5.h"
 #include "xlbus.h"
+#include "readout.h"
 
 static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};
 DECLARE_WAIT_QUEUE_HEAD(openq);
 struct pid * pid_reader = NULL; //TODO: make a list of readers
 
-extern volatile enum {STOPPED, PENDING, RUNNING, COMPLETE} readout_state;
+extern volatile READOUT_STATE readout_state;
+
 extern struct em5_buf buf;
 
 static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)

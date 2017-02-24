@@ -23,6 +23,7 @@ int __init em5_debugfs_init()
 	Items xlregs[] = {
 		{ "data", XLREG_DATA },
 		{ "stat", XLREG_STAT },
+		{ "splen", XLREG_SPLEN},
 		{ "pchi", XLREG_PCHI },
 		{ "pchn", XLREG_PCHN },
 		{ "ifr" , XLREG_IFR  },

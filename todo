@@ -1,4 +1,8 @@
-* add module parameter "debug"
+totest:
+sysfs - counts
+
+
+
 
 !!! create_workqueue -> alloc_workqueue
 
@@ -9,3 +13,34 @@ http://clish.sourceforge.net/clish-0.7.3/index.html
 
 
 firmware: http://www.crashcourse.ca/wiki/index.php/Loading_external_firmware
+
+//-- spill --
+//FIXME: spill->readout
+
+//~ static ssize_t spill_show(struct device *dev, struct device_attribute *attr, char *buf)
+//~ {
+	//~ return sprintf(buf, "%d\n", em5_get_spill() ? 1 : 0);
+//~ }
+//~ 
+//~ static ssize_t spill_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
+//~ {
+	//~ unsigned long val;
+	//~ 
+	//~ if( strict_strtoul(buf, /*base*/ 0, &val))
+		//~ return -EINVAL;
+		//~ 
+	//~ switch(val)
+	//~ {
+	//~ case 0:
+	//~ case 1:
+		//~ em5_set_spill(val);
+		//~ break;
+	//~ default:
+		//~ pr_err("Spill can be 1 or 0.\n");
+		//~ return -EINVAL;
+	//~ }
+	//~ 
+	//~ return n;
+//~ }
+//~ 
+//~ static DEVICE_ATTR(spill, 0644, spill_show, spill_store);

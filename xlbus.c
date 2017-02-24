@@ -11,6 +11,7 @@
 
 #include "mach/gpio.h"	/* gpio_set_value, gpio_get_value */
 #include <linux/delay.h>
+#include <asm/atomic.h>
 
 #include "module.h"
 #include "em5.h"
@@ -37,16 +38,17 @@ static struct workqueue_struct * dataloop_wq;  /// workqueue for dataloop
 
 typedef struct {
 	struct work_struct work;
-	void * addr;
-	unsigned max;
-	unsigned bytes;
-	bool started; 
-	bool running;  // readout is actually going on
-	bool overflow;  // trying to reed more then max bytes
-	} dataloop_work_t;
+	bool started;
+	bool running;
+	struct {
+		void * addr;
+		unsigned max;
+		unsigned bytes;
+		bool overflow;  // trying to reed more then max bytes
+	} data;
+} dataloop_work_t;
 
 dataloop_work_t * dataloop_work;
-
 
 static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
@@ -56,8 +58,8 @@ static void _dataloop(struct work_struct *work)
 	
 	unsigned wcount;
 	unsigned words = 0;  //counter
-	unsigned * addr = (u32*)dwork->addr;
-	unsigned wmax = dwork->max * sizeof(u32);
+	unsigned * addr = (u32*)dwork->data.addr;
+	unsigned wmax = dwork->data.max / sizeof(u32);
 	
 	dwork->running = TRUE;
 	
@@ -68,7 +70,7 @@ static void _dataloop(struct work_struct *work)
 		
 		if (words + wcount > wmax) {  /// overflow
 			wcount = wmax - words;
-			dwork->overflow = TRUE;
+			dwork->data.overflow = TRUE;
 		}
 		
 		while (wcount--)
@@ -77,7 +79,7 @@ static void _dataloop(struct work_struct *work)
 			words++;
 		}
 
-		dwork->bytes = words * sizeof(u32);
+		dwork->data.bytes = words * sizeof(u32);
 		
 		if (words >= wmax) break;  /// overflow
 		
@@ -87,22 +89,22 @@ static void _dataloop(struct work_struct *work)
 	}
 	
 	dwork->running = FALSE;
-
 	wake_up_interruptible(&dataloop_wait);
 }
 
 
 void xlbus_dataloop_start(void * addr, unsigned max /* buffer length */)
 {
-	if (dataloop_work->started || dataloop_work->running) {
-		PERROR("trying to start readout loop while already started ");
+	if (dataloop_work->started) {
+		PERROR("trying to start readout loop while already running ");
 		return;
 	}
 	
-	memset(&dataloop_work, 0, sizeof(dataloop_work));  ///clear
-	dataloop_work->addr = addr;
-	dataloop_work->max  = max;
 	dataloop_work->started = TRUE;
+	PDEBUG("sz dataloop_work->data %d", sizeof(dataloop_work->data));
+	memset(&dataloop_work->data, 0, sizeof(dataloop_work->data));  ///clear
+	dataloop_work->data.addr = addr;
+	dataloop_work->data.max  = max;
 
 	queue_work(dataloop_wq, (struct work_struct *)dataloop_work);
 }
@@ -110,21 +112,26 @@ void xlbus_dataloop_start(void * addr, unsigned max /* buffer length */)
 
 unsigned int xlbus_dataloop_stop(void)
 {
-	unsigned int bytes;
+	unsigned int bytes = 0;
 	
 	if (dataloop_work->running == FALSE) {
 		PWARNING("trying to stop fifo readout loop while not running");
 		return 0;
 	}
-	
+
 	dataloop_work->started = FALSE;
 	PDEBUG("stopping fifo readout");
 
 	wait_event_interruptible(dataloop_wait, !dataloop_work->running);
-	bytes = dataloop_work->bytes;
+	bytes = dataloop_work->data.bytes;
 	pr_devel("bytes = %d\n\n", bytes);
 	
 	return bytes;
+}
+
+unsigned xlbus_dataloop_count(void)
+{
+	return dataloop_work->data.bytes;
 }
 
 
@@ -152,6 +159,13 @@ void xlbus_reset() {
 	return;
 }
 
+xlbus_counts xlbus_counts_get(void)
+/* Get EM5 counters */
+{
+	xlbus_counts val = (xlbus_counts) ioread32(XLREG_COUNTR);
+	return val;
+}
+
 #ifdef PXA_MSC_CONFIG
 unsigned xlbus_msc_get(void)
 {
@@ -172,6 +186,8 @@ void xlbus_msc_set(unsigned val)
 	return;
 }
 #endif
+
+
 
 void xlbus_sw_ext_trig(int val) 
 /** Enable/disable the external trigger intput on front pannel. */
@@ -218,8 +234,6 @@ int __init em5_xlbus_init()
 	}
 	
 	INIT_WORK( (struct work_struct *)dataloop_work, _dataloop );
-
-	
 	
 	#ifdef PXA_MSC_CONFIG
 	if ( !request_mem_region( PXA_MSC_BASE, PXA_MSC_LEN, MODULE_NAME) ) {
@@ -238,16 +252,15 @@ int __init em5_xlbus_init()
 	PDEBUG("pxa-msc conrol registers ioremapped %lx->%lx", mscbase, mscbase);
 	#endif
 	
-	
 	return 0;
 }
 
 void em5_xlbus_free()
 {
-	dataloop_work->running = 0;
+	dataloop_work->started = FALSE;
 	
 	if (dataloop_wq) {
-		flush_workqueue( dataloop_wq );
+		flush_workqueue( dataloop_wq );  // waits until stopped 
 		destroy_workqueue( dataloop_wq );
 	}
 	
