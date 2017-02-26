@@ -52,13 +52,13 @@ const char * readout_state_str( void) {
 
 void _do_work_bs(struct work_struct *work) 
 {
-	PDEVEL("--- \nBS! \n");
+	PDEVEL("--- BS!");
 	readout_start();
 }
 
 void _do_work_es(struct work_struct *work)
 {
-	PDEVEL("ES! \n");
+	PDEVEL("ES!");
 	readout_stop();
 }
 
@@ -137,7 +137,7 @@ void readout_start(void)
 		xlbus_dataloop_start(buf.vaddr, buf.size);
 	}
 	
-	xlbus_sw_ext_trig(1);  ///enable trigger input
+	xlbus_trig_ena(TRUE);  ///enable trigger input
 	
 	//~ wake_up_interruptible(&queue_spill);
 }
@@ -149,6 +149,8 @@ int readout_stop(void)  /// can sleep
  */
 {
 	unsigned int cnt = 0;
+	
+	xlbus_trig_ena(FALSE);
 	
 	readout_state = PENDING;
 	switch (readout_mode)

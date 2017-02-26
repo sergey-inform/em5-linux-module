@@ -44,7 +44,6 @@ extern ulong xlbase_hw;
 #define IFR_FF		(1<<3)	// fifo almost full
 #define IFR_FE		(1<<4)	// fifo empty
 
-
 /* wishlist
 1) separate register for aprd
 2) a way to set spill counter (not only reset to 0)

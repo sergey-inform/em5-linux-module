@@ -3,6 +3,7 @@
  */
  
 enum bool {FALSE, TRUE};
+#define setbit(num, val) (num & ~(val) | (val)
 
 #define MODULE_NAME	KBUILD_MODNAME
 #define DEVICE_NAME	"em5"

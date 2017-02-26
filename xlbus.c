@@ -33,6 +33,8 @@ ulong mscbase = 0;
 ulong mscbase_hw = 0;
 #endif
 
+#define SET_BITS(p, bits, val) ( (val) ? (p)|(bits) : (p) & ~(bits))
+
 DECLARE_WAIT_QUEUE_HEAD(dataloop_wait);  /// wait queue
 static struct workqueue_struct * dataloop_wq;  /// workqueue for dataloop
 
@@ -190,7 +192,6 @@ void xlbus_msc_set(unsigned val)
 
 
 void xlbus_sw_ext_trig(int val) 
-/** Enable/disable the external trigger intput on front pannel. */
 {
 	//FIXME: get ctrl spinlock
 	unsigned int ctrl = ioread32(XLREG_CTRL);
@@ -254,6 +255,34 @@ int __init em5_xlbus_init()
 	#endif
 	
 	return 0;
+}
+
+void xlbus_trig_ena(bool val) {
+/** Enable/disable the external trigger intput on the front pannel.
+ */
+	iowrite32( SET_BITS(ioread32(XLREG_CTRL), TRIG_ENA, val),
+			XLREG_CTRL);
+}
+
+void xlbus_busy(bool val) {
+/** Set/unset busy output on the front pannel.
+ */
+	iowrite32( SET_BITS( ioread32(XLREG_CTRL), PROG_BUSY, val),
+			XLREG_CTRL);
+	}
+
+void xlbus_spill_ena(bool val) {
+/** Enable/disable spill interrupts by spill input on the front pannel.
+ */
+	iowrite32( SET_BITS(ioread32(XLREG_CTRL), BS_ENA | ES_ENA, val),
+			XLREG_CTRL);
+}
+
+void xlbus_dreq_ena(bool val) {
+/** Enable/disable dma interrupts.
+ */
+	iowrite32( SET_BITS( ioread32(XLREG_CTRL), DMA_ENA, val),
+			XLREG_CTRL);
 }
 
 void em5_xlbus_free()
