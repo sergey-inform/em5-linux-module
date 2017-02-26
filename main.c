@@ -80,6 +80,7 @@ static int __init em5_init(void)
 	pr_info( MODULE_NAME " has been loaded.\n" );
 	
 	// TODO:if mode is daq, enable BS IRQ, set busy output to 0.
+	
 	return err;
 }
 

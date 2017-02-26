@@ -1,6 +1,6 @@
 int em5_readout_init( void);
 void em5_readout_free( void);
-int readout_start( void);
+void readout_start( void);
 int readout_stop( void);
 const char * readout_state_str( void);
 

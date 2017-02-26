@@ -10,6 +10,7 @@
 #include <linux/sched.h>        /* TASK_INTERRUPTIBLE */
 #include <linux/jiffies.h> /*time*/
 #include <linux/sched.h>
+#include <linux/mutex.h>
 
 #include "xlbus.h"
 #include "module.h"
@@ -41,6 +42,8 @@ extern ulong xlbase; /** note: here we use it as dev_id (a cookie for callbacks)
 
 static struct workqueue_struct * irq_wq; ///workqueue for irq bootom half (for BS/ES events)
 struct work_struct work_bs, work_es;
+
+DEFINE_MUTEX(readout_mux);
 
 static const char * readout_state_strings[] = {READOUT_STATE_STRINGS};
 const char * readout_state_str( void) {
@@ -100,15 +103,13 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	return IRQ_HANDLED;
 }
 
-int readout_start(void)
+void readout_start(void)
 /** Begin FIFO readout.
  */
 {
+	if (mutex_trylock(&readout_mux) == 0)  // 0 -- failed, 1 -- locked
+        return;
 	
-	//TODO: add mutex
-	
-	
-	int ret = 0;
 	//~ int kill_err = 0;
 	//~ struct task_struct * reader;
 	
@@ -139,7 +140,6 @@ int readout_start(void)
 	xlbus_sw_ext_trig(1);  ///enable trigger input
 	
 	//~ wake_up_interruptible(&queue_spill);
-	return ret;
 }
 
 
@@ -160,7 +160,9 @@ int readout_stop(void)  /// can sleep
 	buf.count = cnt;
 	
 	readout_state = COMPLETE;
-	wake_up_interruptible(&openq);  /// wake up queue_newdata
+	//~ wake_up_interruptible(&openq);  /// wake up queue_newdata
+	
+	mutex_unlock(&readout_mux);
 	return 0;
 }
 
