@@ -101,8 +101,8 @@ void xlbus_dataloop_start(void * addr, unsigned max /* buffer length */)
 	}
 	
 	dataloop_work->started = TRUE;
-	PDEBUG("sz dataloop_work->data %d", sizeof(dataloop_work->data));
 	memset(&dataloop_work->data, 0, sizeof(dataloop_work->data));  ///clear
+	
 	dataloop_work->data.addr = addr;
 	dataloop_work->data.max  = max;
 
@@ -227,13 +227,14 @@ int __init em5_xlbus_init()
 		return -EFAULT;
 	}
 	
-	dataloop_work = (dataloop_work_t *)kmalloc(sizeof(dataloop_work_t), GFP_KERNEL);
+	dataloop_work = (dataloop_work_t *)kzalloc(sizeof(dataloop_work_t), GFP_KERNEL);
 	if (!dataloop_work) {
 		pr_err("xlbus: kmalloc dataloop_work.");
 		return -ENOMEM;
 	}
 	
-	INIT_WORK( (struct work_struct *)dataloop_work, _dataloop );
+	INIT_WORK(&dataloop_work->work, _dataloop );
+	PDEBUG("dataloop_work->started %d", dataloop_work->started );
 	
 	#ifdef PXA_MSC_CONFIG
 	if ( !request_mem_region( PXA_MSC_BASE, PXA_MSC_LEN, MODULE_NAME) ) {
