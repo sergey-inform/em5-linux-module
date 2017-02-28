@@ -167,10 +167,10 @@ int readout_stop(void)  /// can sleep
 	sstats.bytes = cnt;
 	
 	if (sstats.unexpected_bs_irq)
-		PERROR("BS irq unexpected: %d ", sstats.unexpected_bs_irq);
+		PWARNING("BS irq unexpected: %d ", sstats.unexpected_bs_irq);
 		
 	if (sstats.unexpected_es_irq)
-		PERROR("ES irq unexpected: %d ", sstats.unexpected_es_irq);
+		PWARNING("ES irq unexpected: %d ", sstats.unexpected_es_irq);
 	
 	readout_state = COMPLETE;
 	//~ wake_up_interruptible(&openq);  /// wake up complete_q

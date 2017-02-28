@@ -23,13 +23,8 @@ typedef struct {
 	struct work_struct work;
 	bool started;
 	bool running;
-	struct {
-		void * addr;
-		unsigned max;
-		unsigned bytes;
-		bool overflow;  // trying to reed more then max bytes
-	} data;
-} dataloop_work_t;
+	struct em5_buf * buf;
+	} dataloop_work_t;
 
 dataloop_work_t * dataloop_work;
 
@@ -38,14 +33,14 @@ static void _dataloop(struct work_struct *work)
  */
 {
 	dataloop_work_t * dwork = (dataloop_work_t *) work;
+	struct em5_buf * buf = dwork->buf;
 	
-	unsigned wcount;
 	unsigned words = 0;  //counter
-	unsigned * addr = (u32*)dwork->data.addr;
-	unsigned wmax = dwork->data.max / sizeof(u32);
+	unsigned wcount;
+	unsigned wmax = buf->size / sizeof(u32);
+	unsigned * addr = (u32*)buf->vaddr;
 	
 	dwork->running = TRUE;
-	
 	while (dwork->started)
 	{
 		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
@@ -53,7 +48,6 @@ static void _dataloop(struct work_struct *work)
 		
 		if (words + wcount > wmax) {  /// overflow
 			wcount = wmax - words;
-			dwork->data.overflow = TRUE;
 		}
 		
 		while (wcount--)
@@ -62,7 +56,7 @@ static void _dataloop(struct work_struct *work)
 			words++;
 		}
 
-		dwork->data.bytes = words * sizeof(u32);
+		buf->count = words * sizeof(u32);
 		
 		if (words >= wmax) break;  /// overflow
 		
@@ -82,16 +76,9 @@ void dataloop_start(void * addr, unsigned max /* buffer length */)
 		PERROR("trying to start readout loop while already running ");
 		return;
 	}
-	
-	
 	PDEBUG("starting fifo readout loop");
 	
 	dataloop_work->started = TRUE;
-	memset(&dataloop_work->data, 0, sizeof(dataloop_work->data));  ///clear
-	
-	dataloop_work->data.addr = addr;
-	dataloop_work->data.max  = max;
-
 	queue_work(dataloop_wq, (struct work_struct *)dataloop_work);
 }
 
@@ -109,17 +96,17 @@ unsigned int dataloop_stop(void)
 	PDEBUG("stopping fifo readout");
 
 	wait_event_interruptible(pending_wait, !dataloop_work->running);
-	bytes = dataloop_work->data.bytes;
-	PDEBUG("bytes = %d", bytes);
 	
+	bytes = dataloop_work->buf->count;
+	PDEBUG("bytes = %d", bytes);
 	return bytes;
 }
 
+
 unsigned dataloop_count(void)
 {
-	return dataloop_work->data.bytes;
+	return dataloop_work->buf->count;
 }
-
 
 
 int __init em5_dataloop_init( struct em5_buf * buf)
@@ -136,6 +123,7 @@ int __init em5_dataloop_init( struct em5_buf * buf)
 		pr_err("xlbus: kmalloc dataloop_work.");
 		return -ENOMEM;
 	}
+	dataloop_work->buf = buf;
 	
 	INIT_WORK(&dataloop_work->work, _dataloop );
 	PDEBUG("dataloop_work->started %d", dataloop_work->started );

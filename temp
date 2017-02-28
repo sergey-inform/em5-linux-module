@@ -5,5 +5,8 @@ MODULE_PARM_DESC( spill_latency, "How long the readout lasts after the end of sp
 
 + 1. ff overflows, spill info
 2. fix buf counts 
+
 3. spill stats sleep until complete
+4. fix readout /dev/em5
+5. wait_state
 
