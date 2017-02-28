@@ -93,6 +93,7 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	
 	if (flags & IFR_FF) {
 		/* FIFO Full  - not working in hardware yet.*/
+		sstats.fifo_fulls += 1;
 	}
 	
 	if (flags & IFR_FE) {
@@ -107,24 +108,27 @@ void readout_start(void)
 /** Begin FIFO readout.
  */
 {
+	
+	int kill_err = 0;
+	struct task_struct * reader;
+	
 	if (mutex_trylock(&readout_mux) == 0)  // 0 -- failed, 1 -- locked
         return;
-	
-	//~ int kill_err = 0;
-	//~ struct task_struct * reader;
+        
+    memset(&sstats, 0, sizeof(sstats)); /// flush spill statistics
 	
 	readout_state = READOUT;
-
-	//~ if (pid_reader != NULL) {
-		//~ /* Send signal to an active reader 
-		 //~ * (a process which mmapped the memory buffer) */
-		//~ reader = pid_task(pid_reader, PIDTYPE_PID);
-		//~ kill_err = send_sig(SIGUSR1, reader, 0 /*priv*/ );
-	//~ }
-	//~ if (kill_err) {
-		//~ PWARNING("sending signal active reader failed, PID: %d ",
-			//~ pid_nr(pid_reader));
-	//~ }
+	
+	if (pid_reader != NULL) {
+		/* Send a signal to the active reader 
+		 * (a process which mmapped the memory buffer or opened the charfile) */
+		reader = pid_task(pid_reader, PIDTYPE_PID);
+		kill_err = send_sig(SIGUSR1, reader, 0 /*priv*/ );
+	}
+	if (kill_err) {
+		PWARNING("sending signal active reader failed, PID: %d ",
+				pid_nr(pid_reader));
+	}
 
 	buf.count = 0;  ///reset buffer
 	
@@ -139,7 +143,7 @@ void readout_start(void)
 	
 	xlbus_trig_ena(TRUE);  ///enable trigger input
 	
-	//~ wake_up_interruptible(&queue_spill);
+	wake_up_interruptible(&openq);  // ->readout_q
 }
 
 
@@ -150,7 +154,7 @@ int readout_stop(void)  /// can sleep
 {
 	unsigned int cnt = 0;
 	
-	xlbus_trig_ena(FALSE);
+	xlbus_trig_ena(FALSE);  /// Disable trigger intput.
 	
 	readout_state = PENDING;
 	switch (readout_mode)
@@ -162,7 +166,7 @@ int readout_stop(void)  /// can sleep
 	buf.count = cnt;
 	
 	readout_state = COMPLETE;
-	//~ wake_up_interruptible(&openq);  /// wake up queue_newdata
+	//~ wake_up_interruptible(&openq);  /// wake up complete_q
 	
 	mutex_unlock(&readout_mux);
 	return 0;
@@ -184,7 +188,7 @@ int em5_readout_init()
 	INIT_WORK_ONSTACK(&work_bs, _do_work_bs );
 	INIT_WORK_ONSTACK(&work_es, _do_work_es );
 	
-	iowrite32(PROG_BUSY, XLREG_CTRL); //set busy output to 1.
+	iowrite32(PROG_BUSY, XLREG_CTRL); //set busy to 1, other flags to 0.
 	flags = ioread32(XLREG_IFR);
 	iowrite32(flags, XLREG_IFR); //clear interrupt flags
 	

@@ -35,8 +35,8 @@ ulong mscbase_hw = 0;
 
 #define SET_BITS(p, bits, val) ( (val) ? (p)|(bits) : (p) & ~(bits))
 
-DECLARE_WAIT_QUEUE_HEAD(dataloop_wait);  /// wait queue
-static struct workqueue_struct * dataloop_wq;  /// workqueue for dataloop
+DECLARE_WAIT_QUEUE_HEAD(pending_wait);  /// wait readout to finish
+static struct workqueue_struct * dataloop_wq;  /// a workqueue instead of kernel thread
 
 typedef struct {
 	struct work_struct work;
@@ -91,7 +91,7 @@ static void _dataloop(struct work_struct *work)
 	}
 	
 	dwork->running = FALSE;
-	wake_up_interruptible(&dataloop_wait);
+	wake_up_interruptible(&pending_wait);
 }
 
 
@@ -101,6 +101,9 @@ void xlbus_dataloop_start(void * addr, unsigned max /* buffer length */)
 		PERROR("trying to start readout loop while already running ");
 		return;
 	}
+	
+	
+	PDEBUG("starting fifo readout loop");
 	
 	dataloop_work->started = TRUE;
 	memset(&dataloop_work->data, 0, sizeof(dataloop_work->data));  ///clear
@@ -124,9 +127,9 @@ unsigned int xlbus_dataloop_stop(void)
 	dataloop_work->started = FALSE;
 	PDEBUG("stopping fifo readout");
 
-	wait_event_interruptible(dataloop_wait, !dataloop_work->running);
+	wait_event_interruptible(pending_wait, !dataloop_work->running);
 	bytes = dataloop_work->data.bytes;
-	pr_devel("bytes = %d\n\n", bytes);
+	PDEBUG("bytes = %d", bytes);
 	
 	return bytes;
 }
@@ -137,22 +140,22 @@ unsigned xlbus_dataloop_count(void)
 }
 
 
-int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
-	
-	//check_size
-	
-	switch (cmd)
-	{
-	case EM5_TEST:
+//~ int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
+	//~ 
+	//~ //check_size
+	//~ 
+	//~ switch (cmd)
+	//~ {
+	//~ case EM5_TEST:
 		//~ pr_warn("em5-ioctl-test: %ld", (long)word);
-		pr_warn("em5-ioctl-test.\n");
-		break;
-	
-	case EM5_CMD_MAXNR:
-		break; /*to suppress compilation warning*/
-	}
-	return 0;
-}
+		//~ pr_warn("em5-ioctl-test.\n");
+		//~ break;
+	//~ 
+	//~ case EM5_CMD_MAXNR:
+		//~ break; /*to suppress compilation warning*/
+	//~ }
+	//~ return 0;
+//~ }
 
 void xlbus_reset() {
 	gpio_set_value(gpio_nRST, 0);
@@ -168,7 +171,39 @@ xlbus_counts xlbus_counts_get(void)
 	return val;
 }
 
+// FIXME: spinlock for control register
+
+void xlbus_trig_ena(bool val) {
+/** Enable/disable the external trigger intput on the front pannel.
+ */
+	iowrite32( SET_BITS(ioread32(XLREG_CTRL), TRIG_ENA, val),
+			XLREG_CTRL);
+}
+
+void xlbus_busy(bool val) {
+/** Set/unset busy output on the front pannel.
+ */
+	iowrite32( SET_BITS( ioread32(XLREG_CTRL), PROG_BUSY, val),
+			XLREG_CTRL);
+}
+
+void xlbus_spill_ena(bool val) {
+/** Enable/disable spill interrupts by spill input on the front pannel.
+ */
+	iowrite32( SET_BITS(ioread32(XLREG_CTRL), BS_ENA | ES_ENA, val),
+			XLREG_CTRL);
+}
+
+void xlbus_dreq_ena(bool val) {
+/** Enable/disable dma interrupts.
+ */
+	iowrite32( SET_BITS( ioread32(XLREG_CTRL), DMA_ENA, val),
+			XLREG_CTRL);
+}
+
+
 #ifdef PXA_MSC_CONFIG
+
 unsigned xlbus_msc_get(void)
 {
 	unsigned val = ioread32((void*)(mscbase + MSC1_OFF));
@@ -177,8 +212,7 @@ unsigned xlbus_msc_get(void)
 }
 
 void xlbus_msc_set(unsigned val)
-/** ChipSelect-2 settings for fpga bus.
- */
+/** ChipSelect-2 settings for fpga bus. */
 {
 	int addr = mscbase + MSC1_OFF;
 	unsigned new, old =  ioread32((void*)addr);
@@ -188,21 +222,6 @@ void xlbus_msc_set(unsigned val)
 	return;
 }
 #endif
-
-
-
-void xlbus_sw_ext_trig(int val) 
-{
-	//FIXME: get ctrl spinlock
-	unsigned int ctrl = ioread32(XLREG_CTRL);
-	
-	if (val)
-		iowrite32(ctrl | TRIG_ENA, XLREG_CTRL);
-	else
-		iowrite32(ctrl & ~TRIG_ENA, XLREG_CTRL);
-	
-	//FIXME: free ctrl spinlock
-}
 
 int __init em5_xlbus_init() 
 {
@@ -255,34 +274,6 @@ int __init em5_xlbus_init()
 	#endif
 	
 	return 0;
-}
-
-void xlbus_trig_ena(bool val) {
-/** Enable/disable the external trigger intput on the front pannel.
- */
-	iowrite32( SET_BITS(ioread32(XLREG_CTRL), TRIG_ENA, val),
-			XLREG_CTRL);
-}
-
-void xlbus_busy(bool val) {
-/** Set/unset busy output on the front pannel.
- */
-	iowrite32( SET_BITS( ioread32(XLREG_CTRL), PROG_BUSY, val),
-			XLREG_CTRL);
-	}
-
-void xlbus_spill_ena(bool val) {
-/** Enable/disable spill interrupts by spill input on the front pannel.
- */
-	iowrite32( SET_BITS(ioread32(XLREG_CTRL), BS_ENA | ES_ENA, val),
-			XLREG_CTRL);
-}
-
-void xlbus_dreq_ena(bool val) {
-/** Enable/disable dma interrupts.
- */
-	iowrite32( SET_BITS( ioread32(XLREG_CTRL), DMA_ENA, val),
-			XLREG_CTRL);
 }
 
 void em5_xlbus_free()

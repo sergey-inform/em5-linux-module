@@ -44,12 +44,7 @@ extern ulong xlbase_hw;
 #define IFR_FF		(1<<3)	// fifo almost full
 #define IFR_FE		(1<<4)	// fifo empty
 
-/* wishlist
+/* wishlist for em_cc verilog 
 1) separate register for aprd
 2) a way to set spill counter (not only reset to 0)
-*/
-
-/* 2 doc
-Счетчик спилов имеет ограничение, т.е. на У-70 раз в 6 суток он будет обнуляться.
-Счетчик триггеров имеет ограничение -- 65535.
 */

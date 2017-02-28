@@ -60,8 +60,6 @@ int em5_buf_mmap(struct em5_buf *buf, struct vm_area_struct *vma)
 	
 	vma->vm_flags |= VM_RESERVED;
 	
-	//TODO:track refcount;
-	
 	return 0;
 }
 

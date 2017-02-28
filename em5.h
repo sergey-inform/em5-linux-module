@@ -15,7 +15,7 @@
 
 struct spill_stats {
 	unsigned int bytes;
-	atomic_t fifo_fulls;
+	unsigned int fifo_fulls;
 };
 
 struct run_stats {

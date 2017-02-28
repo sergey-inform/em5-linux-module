@@ -18,7 +18,9 @@
 
 static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};
+
 DECLARE_WAIT_QUEUE_HEAD(openq);
+
 struct pid * pid_reader = NULL; //TODO: make a list of readers
 
 extern volatile READOUT_STATE readout_state;
@@ -54,55 +56,55 @@ static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 } 
 
 
-/**
-   In ARM version of linux 2.6.x we can't get 8-bytes values with get_user.
-   
-   Return the PREVIOUS value of 4-byte em5 status register (the value which it has BEFORE command has been executed).
-   The upper bytes of stat register are always zero, so we are always
-   able to distinguish between status and error;
-*/
+//~ /**
+   //~ In ARM version of linux 2.6.x we can't get 8-bytes values with get_user.
+   //~ 
+   //~ Return the PREVIOUS value of 4-byte em5 status register (the value which it has BEFORE command has been executed).
+   //~ The upper bytes of stat register are always zero, so we are always
+   //~ able to distinguish between status and error;
+//~ */
 
-static long em5_fop_ioctl (struct file * fd, unsigned int ctl, unsigned long addr)
-/*
-   addr is NULL or pointer to emword; 
-   Returns em5 status register on success, negative value on error.
-*/
-{
-	// TODO: finish or remove ioctls from driver
-	int ret = 0;
-
-	/* sanity check */
-	if (_IOC_TYPE(ctl) != EM5_IOC_MAGIC || 	_IOC_NR(ctl) >= EM5_CMD_MAXNR) {
-		return -ENOTTY;
-	}
-	
-	/* security check */
-	if ((void*)addr != NULL) {
-		if (_IOC_DIR(ctl) & _IOC_READ) {/*check user can _write_ *addr */
-			ret += !access_ok( VERIFY_WRITE, (void __user *) addr, _IOC_SIZE(ctl));
-		}
-		if (_IOC_DIR(ctl) & _IOC_WRITE) {/*check user can _read_ *addr */
-			ret += !access_ok( VERIFY_READ, (void __user *) addr, _IOC_SIZE(ctl));
-		}
-		if (ret) {
-			return -EFAULT;
-		}
-	}
-	
-	/* get data */
+//~ static long em5_fop_ioctl (struct file * fd, unsigned int ctl, unsigned long addr)
+//~ /*
+   //~ addr is NULL or pointer to emword; 
+   //~ Returns em5 status register on success, negative value on error.
+//~ */
+//~ {
+	//~ // TODO: finish or remove ioctls from driver
+	//~ int ret = 0;
+//~ 
+	//~ /* sanity check */
+	//~ if (_IOC_TYPE(ctl) != EM5_IOC_MAGIC || 	_IOC_NR(ctl) >= EM5_CMD_MAXNR) {
+		//~ return -ENOTTY;
+	//~ }
+	//~ 
+	//~ /* security check */
+	//~ if ((void*)addr != NULL) {
+		//~ if (_IOC_DIR(ctl) & _IOC_READ) {/*check user can _write_ *addr */
+			//~ ret += !access_ok( VERIFY_WRITE, (void __user *) addr, _IOC_SIZE(ctl));
+		//~ }
+		//~ if (_IOC_DIR(ctl) & _IOC_WRITE) {/*check user can _read_ *addr */
+			//~ ret += !access_ok( VERIFY_READ, (void __user *) addr, _IOC_SIZE(ctl));
+		//~ }
+		//~ if (ret) {
+			//~ return -EFAULT;
+		//~ }
+	//~ }
+	//~ 
+	//~ /* get data */
 	//~ get_user( data, (emword *)addr); /*safely get userspace variable*/
-	
-	/* EM-BUS ioctls: */
-	if (_IOC_NR(ctl) < EM5_CMD_MAXNR) {
-		return xlbus_do( _IOC_NR(ctl), NULL, /*size*/ 0);
-	}
-	
-	/* put data */
+	//~ 
+	//~ /* EM-BUS ioctls: */
+	//~ if (_IOC_NR(ctl) < EM5_CMD_MAXNR) {
+		//~ return xlbus_do( _IOC_NR(ctl), NULL, /*size*/ 0);
+	//~ }
+	//~ 
+	//~ /* put data */
 	//~ if (ret == 0) { /*no error*/
 	//~ put_user (data, (emword *)addr );
-
-	return ret;
-}
+//~ 
+	//~ return ret;
+//~ }
 
 
 // em5_fop_read
@@ -137,13 +139,13 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 		return -EBUSY;
 	}
 	
-	if (wait_event_interruptible(openq, readout_state==COMPLETE) )
+	if (wait_event_interruptible(openq, readout_state==READOUT) )
 		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 	
 	pid_reader = get_task_pid(current, PIDTYPE_PID);
 	
 	//: unlock semaphore
-	pr_devel("file open,  PID: %d\n", pid_nr(pid_reader));
+	pr_devel("charfile opened by reader,  PID: %d\n", pid_nr(pid_reader));
 	return 0;
 }
 
@@ -152,10 +154,8 @@ static int em5_fop_release (struct inode *inode, struct file *filp)
 	struct pid * pid  = get_task_pid(current, PIDTYPE_PID); 
 	if (pid_reader == pid) {
 		pid_reader = NULL;
-		pr_devel("file close, unset reader PID: %d\n", pid_nr(pid));
+		pr_devel("carfile closed, unset reader PID: %d\n", pid_nr(pid));
 	}
-	
-	readout_state = STOPPED;
 	
 	return 0;
 }
@@ -164,9 +164,9 @@ static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count,
 {
 	void * rp;
 	
-	//~ if (wait_event_interruptible(openq, !(readout_state==STOPPED) ) )
-		//~ return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
-	//~ 
+	if (wait_event_interruptible(openq, readout_state!=STOPPED ) )
+		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
+	
 	rp = (void *) (buf.vaddr + *f_pos);
 	
 	if (*f_pos > buf.count)
@@ -188,7 +188,7 @@ static struct file_operations fops = {
 	.open		= em5_fop_open,
 	.release	= em5_fop_release,
 	.mmap		= em5_fop_mmap,
-	.unlocked_ioctl	= em5_fop_ioctl,
+	//~ .unlocked_ioctl	= em5_fop_ioctl,
 	.llseek		= em5_fop_llseek,
 	.read		= em5_fop_read,
 };

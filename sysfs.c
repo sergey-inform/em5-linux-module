@@ -24,7 +24,7 @@ extern wait_queue_head_t openq;
 extern struct spill_stats sstats;
 
 
-//-- counts --
+///-- counts --
 static ssize_t counts_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	xlbus_counts counts = xlbus_counts_get();
@@ -32,7 +32,16 @@ static ssize_t counts_show(struct device *dev, struct device_attribute *attr, ch
 }
 static DEVICE_ATTR(counts, 0444, counts_show, NULL);
 
-//-- state --
+
+///-- stats --
+static ssize_t stats_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf,"bytes %d \nff %d \n", sstats.bytes, sstats.fifo_fulls);
+}
+static DEVICE_ATTR(stats, 0444, stats_show, NULL);
+
+
+///-- state --
 static ssize_t state_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", readout_state_str());
@@ -40,7 +49,7 @@ static ssize_t state_show(struct device *dev, struct device_attribute *attr, cha
 static DEVICE_ATTR(state, 0444, state_show, NULL);
 
 
-//-- force_start --
+///-- force_start --
 static ssize_t force_start_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "Write anything to start readout.\n");
@@ -55,7 +64,7 @@ static ssize_t force_start_store(struct device * dev, struct device_attribute *a
 static DEVICE_ATTR(force_start, 0666, force_start_show, force_start_store);
 
 
-//-- force_stop --
+///-- force_stop --
 static ssize_t force_stop_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "Write anything to stop readout.\n");
@@ -68,6 +77,9 @@ static ssize_t force_stop_store(struct device * dev, struct device_attribute *at
 }
 
 static DEVICE_ATTR(force_stop, 0666, force_stop_show, force_stop_store);
+
+
+
 
 //~ //-- lock --
 //~ static ssize_t lock_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -109,12 +121,13 @@ static ssize_t xlbus_store(struct device * dev, struct device_attribute *attr, c
 static DEVICE_ATTR(xlbus, 0660, xlbus_show, xlbus_store);
 
 #endif
-//------------
+
 
 static struct attribute *_readout_attrs[] = {
 	&dev_attr_state.attr,
 	&dev_attr_counts.attr,
-	//~ &dev_attr_wait_running.attr,
+	&dev_attr_stats.attr,
+	//~ &dev_attr_wait_begin.attr,
 	//~ &dev_attr_wait_complete.attr,
 	//~ &dev_attr_wait_error.attr,
 	&dev_attr_force_start.attr,
