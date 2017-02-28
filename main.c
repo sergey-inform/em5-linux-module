@@ -8,15 +8,16 @@
 #include "module.h"
 #include "buf.h"
 
-
 #include "debugfs.h"
 #include "xlbus.h"
 #include "readout.h"
 #include "charfile.h"
 #include "sysfs.h"
+#include "dma.h"
+#include "dataloop.h"
 #include "em5.h"
 #include "xlregs.h" //FIXME: delme
-#include "dma.h"
+
  
 //~ #undef DEBUG  // uncomment for production
  
@@ -51,6 +52,7 @@ static void em5_cleanup(void)
 	em5_debugfs_free();
 	em5_readout_free();
 	em5_xlbus_free(); //TODO:  check, if it should bee freed before dma.
+	em5_dataloop_free();
 	em5_dma_free();
 	em5_buf_free(&buf);
 	return;
@@ -65,6 +67,7 @@ static int __init em5_init(void)
 	if(
 		(err = em5_buf_init(&buf, param_buf_sz_mb * 1024 * 1024) ) ||
 		(err = em5_xlbus_init() ) || 
+		(err = em5_dataloop_init(&buf)) ||
 		(err = em5_dma_init(&buf)) ||
 		(err = em5_readout_init() ) ||
 		(err = em5_debugfs_init() ) || 

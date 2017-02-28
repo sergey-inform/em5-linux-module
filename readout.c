@@ -13,12 +13,13 @@
 #include <linux/mutex.h>
 
 #include "xlbus.h"
+#include "dataloop.h"
+#include "dma.h"
 #include "module.h"
-#include "readout.h"
 #include "xlregs.h"
 #include "em5.h"
 
-#include "dma.h"
+#include "readout.h"
 
 #include "mach/irqs.h" /* IRQ_GPIO1 */
 	
@@ -138,7 +139,7 @@ void readout_start(void)
 	}
 	else {
 		readout_mode = CPU;
-		xlbus_dataloop_start(buf.vaddr, buf.size);
+		dataloop_start(buf.vaddr, buf.size);
 	}
 	
 	xlbus_trig_ena(TRUE);  ///enable trigger input
@@ -160,7 +161,7 @@ int readout_stop(void)  /// can sleep
 	switch (readout_mode)
 	{
 		case DMA: cnt = dma_readout_stop(); break;
-		case CPU: cnt = xlbus_dataloop_stop(); break;
+		case CPU: cnt = dataloop_stop(); break;
 	}
 	
 	buf.count = cnt;

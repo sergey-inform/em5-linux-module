@@ -1,3 +1,6 @@
+#ifndef EM5_module_H
+#define EM5_module_H
+
 /**
  * Common macroses.
  */
@@ -28,3 +31,4 @@ enum bool {FALSE, TRUE};
 #define PERROR(format, args...)   printk(KERN_ERR MODULE_NAME": " format "\n"  , ##args) //pr_err
 #define PDEVEL(format, args...)   printk(KERN_DEBUG MODULE_NAME": " format "\n"  , ##args) /*prints only when DEBUG flag is set */
 
+#endif /* EM5_module_H */

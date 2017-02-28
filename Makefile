@@ -36,7 +36,7 @@ ccflags-$(DEBUG) += $(DEBFLAGS)
 # kernel build system (and can use its language).
 ifneq ($(KERNELRELEASE),)
 	obj-m += $(TARGET).o
-	$(TARGET)-objs := main.o buf.o xlbus.o  readout.o charfile.o sysfs.o
+	$(TARGET)-objs := main.o buf.o xlbus.o  readout.o charfile.o sysfs.o dataloop.o
 	$(TARGET)-$(CONFIG_DEBUG_FS) += debugfs.o
 	$(TARGET)-$(DMA_READOUT) += dma-pxa270.o
 	

@@ -2,7 +2,7 @@
 #define EM5_dma_H
 
 #include "buf.h"
-//~ #include "module.h"
+#include "module.h"
 
 #ifdef DMA_READOUT
 int em5_dma_init(struct em5_buf *);

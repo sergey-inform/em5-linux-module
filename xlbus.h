@@ -9,10 +9,6 @@ void xlbus_trig_ena(bool);
 void xlbus_spill_ena(bool);
 void xlbus_dreq_ena(bool);
 
-void xlbus_dataloop_start(void * addr, unsigned max);
-unsigned xlbus_dataloop_stop(void);
-unsigned xlbus_dataloop_count(void);
-
 typedef union {
 	unsigned word;
 	struct {
