@@ -78,7 +78,7 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 				queue_work( irq_wq, (struct work_struct *)&work_bs );
 				break;
 			default:
-				// TODO: stats_unexpected_bs_irq++
+				sstats.unexpected_bs_irq += 1;
 				break;
 		}
 	}
@@ -87,20 +87,20 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 			case READOUT:
 				queue_work( irq_wq, (struct work_struct *)&work_es );
 			default:
-				//TODO: stats_unexpected_es_irq++
+				sstats.unexpected_es_irq += 1;
 				break;
 		}
 	}
 	
 	if (flags & IFR_FF) {
-		/* FIFO Full  - not working in hardware yet.*/
-		sstats.fifo_fulls += 1;
+		/* FIFO Full  - broken in hardware.*/
 	}
 	
 	if (flags & IFR_FE) {
-		/* FIFO Empty - not working in hardware yet.*/
+		/* FIFO Empty - broken in hardware.*/
 	}
 	
+	mb();
 	iowrite32(flags, XLREG_IFR); //clear flags
 	return IRQ_HANDLED;
 }
@@ -164,7 +164,13 @@ int readout_stop(void)  /// can sleep
 		case CPU: cnt = dataloop_stop(); break;
 	}
 	
-	buf.count = cnt;
+	sstats.bytes = cnt;
+	
+	if (sstats.unexpected_bs_irq)
+		PERROR("BS irq unexpected: %d ", sstats.unexpected_bs_irq);
+		
+	if (sstats.unexpected_es_irq)
+		PERROR("ES irq unexpected: %d ", sstats.unexpected_es_irq);
 	
 	readout_state = COMPLETE;
 	//~ wake_up_interruptible(&openq);  /// wake up complete_q
@@ -190,6 +196,7 @@ int em5_readout_init()
 	INIT_WORK_ONSTACK(&work_es, _do_work_es );
 	
 	iowrite32(PROG_BUSY, XLREG_CTRL); //set busy to 1, other flags to 0.
+	
 	flags = ioread32(XLREG_IFR);
 	iowrite32(flags, XLREG_IFR); //clear interrupt flags
 	

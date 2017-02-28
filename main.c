@@ -82,7 +82,9 @@ static int __init em5_init(void)
 	
 	pr_info( MODULE_NAME " has been loaded.\n" );
 	
-	xlbus_spill_ena(TRUE);
+	PDEBUG("reset the bus");
+	xlbus_reset(); // generate OS (bus reset)
+	xlbus_irq_ena(TRUE);
 	xlbus_busy(FALSE);
 	
 	return err;

@@ -219,9 +219,6 @@ u32 dma_readout_stop(void)
 	//~ pr_info("wake_up_interruptible - ok");
 	//~ return 0;
 
-
-
-
 int em5_dma_init( struct em5_buf * buf)
 {
 	int i = 0;

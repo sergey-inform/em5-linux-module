@@ -39,6 +39,7 @@ extern ulong xlbase_hw;
 #define STAT_MISS_ERR  	(1<<3)
 
 /* Interrupt flag register */
+#define IFR_00		(1<<0)	// 
 #define IFR_BS		(1<<1)	// Begin-of-Spill
 #define IFR_ES		(1<<2)	// End-of-Spill
 #define IFR_FF		(1<<3)	// fifo almost full
@@ -47,4 +48,5 @@ extern ulong xlbase_hw;
 /* wishlist for em_cc verilog 
 1) separate register for aprd
 2) a way to set spill counter (not only reset to 0)
+3) fix broken IFR_FF, IFR_FE
 */

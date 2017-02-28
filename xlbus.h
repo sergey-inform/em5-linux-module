@@ -6,7 +6,7 @@ void em5_xlbus_free(void);
 void xlbus_reset(void);
 void xlbus_busy(bool);
 void xlbus_trig_ena(bool);
-void xlbus_spill_ena(bool);
+void xlbus_irq_ena(bool);
 void xlbus_dreq_ena(bool);
 
 typedef union {

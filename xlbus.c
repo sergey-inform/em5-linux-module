@@ -82,12 +82,18 @@ void xlbus_busy(bool val) {
 			XLREG_CTRL);
 }
 
-void xlbus_spill_ena(bool val) {
-/** Enable/disable spill interrupts by spill input on the front pannel.
+void xlbus_irq_ena(bool val) {
+/** Enable/disable spill and fifo interrupts.
  */
+	/* Broken in hardware
+	iowrite32( SET_BITS(ioread32(XLREG_CTRL), FF_ENA | FE_ENA, val),
+			XLREG_CTRL);
+	mb();
+	*/
 	iowrite32( SET_BITS(ioread32(XLREG_CTRL), BS_ENA | ES_ENA, val),
 			XLREG_CTRL);
 }
+
 
 void xlbus_dreq_ena(bool val) {
 /** Enable/disable dma interrupts.
