@@ -29,8 +29,6 @@ typedef struct {
 
 dataloop_work_t * dataloop_work;
 
-
-
 static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
  */
@@ -44,7 +42,7 @@ static void _dataloop(struct work_struct *work)
 	unsigned * addr = (u32*)buf->vaddr;
 	
 	unsigned wfifo_full = WRCOUNT_MASK - WRCOUNT_MASK / 8;
-	unsigned wfifo_burst = 32;
+	unsigned wfifo_burst = 64;
 	
 	dwork->running = TRUE;
 	
@@ -52,11 +50,6 @@ static void _dataloop(struct work_struct *work)
 		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
 		
 		if (wcount < wfifo_burst) {
-			prepare_to_wait(&dev->outq, &wait, TASK_INTERRUPTIBLE);
-                if (spacefree(dev) == 0)
-                        schedule();
-                finish_wait(&dev->outq, &wait);
-
 			schedule();   /// take a nap
 			wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
 		}
