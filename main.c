@@ -16,7 +16,6 @@
 #include "dma.h"
 #include "dataloop.h"
 #include "em5.h"
-#include "xlregs.h" //FIXME: delme
 
  
 //~ #undef DEBUG  // uncomment for production
