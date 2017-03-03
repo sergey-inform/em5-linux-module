@@ -161,12 +161,12 @@ int readout_stop(void)  /// can sleep
 	
 	if (xlbus_is_error())
 		readout_state = ERROR;
-	
 	else if (buf.count == buf.size)
 		readout_state = OVERFLOW;
 	else 
 		readout_state = COMPLETE;
-	
+
+	PDEVEL("buf cnt %lu, sz %lu", buf.count, buf.size);
 	notify_readers();
 	
 	wake_up_interruptible(&stop_q);  /// wake up processes waiting for readout complete

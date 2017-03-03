@@ -17,6 +17,7 @@
 struct spill_stats {
 	unsigned int bytes;
 	unsigned int fifo_fulls;
+	unsigned int bursts_count;
 	unsigned int unexpected_bs_irq;
 	unsigned int unexpected_es_irq;
 };

@@ -38,7 +38,7 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 	//~ if (wait_event_interruptible(complete_q, readout_state==COMPLETE) )
 		//~ return -ERESTARTSYS; /* got signal: tell the fs layer to handle it */
 	
-	return sprintf(buf,"bytes %d \nff %d \n", sstats.bytes, sstats.fifo_fulls);
+	return sprintf(buf,"bytes %d \nff %d \nbursts %d \n", sstats.bytes, sstats.fifo_fulls, sstats.bursts_count);
 }
 static DEVICE_ATTR(stats, 0444, stats_show, NULL);
 

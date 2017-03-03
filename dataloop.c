@@ -29,6 +29,8 @@ typedef struct {
 
 dataloop_work_t * dataloop_work;
 
+
+
 static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
  */
@@ -42,20 +44,30 @@ static void _dataloop(struct work_struct *work)
 	unsigned * addr = (u32*)buf->vaddr;
 	
 	unsigned wfifo_full = WRCOUNT_MASK - WRCOUNT_MASK / 8;
+	unsigned wfifo_burst = 32;
 	
 	dwork->running = TRUE;
 	
-	while (dwork->started)
-	{
+	do {
 		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
+		
+		if (wcount < wfifo_burst) {
+			prepare_to_wait(&dev->outq, &wait, TASK_INTERRUPTIBLE);
+                if (spacefree(dev) == 0)
+                        schedule();
+                finish_wait(&dev->outq, &wait);
+
+			schedule();   /// take a nap
+			wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
+		}
+		
+		sstats.bursts_count += 1;
 		
 		if (wcount >= wfifo_full) {
 			sstats.fifo_fulls += 1;
 		}
 		
-		if (words + wcount > wmax) {  /// buffer overflow
-			wcount = wmax - words;
-		}
+		wcount = min(wcount, wmax-words);  /// prevent overflow
 		
 		while (wcount--)
 		{
@@ -66,13 +78,10 @@ static void _dataloop(struct work_struct *work)
 		buf->count = words * sizeof(u32);
 		notify_readers();
 		
-		if (words >= wmax) break;  /// overflow
-		//~ 
-		//~ if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
+		if (words >= wmax)  /// buffer is full
+			break;  
 		
-		schedule(); ///take a nap
-		//~ }
-	}
+	} while (dwork->started);
 	
 	dwork->running = FALSE;
 	wake_up_interruptible(&pending_q);
