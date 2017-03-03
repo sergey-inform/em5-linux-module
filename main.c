@@ -55,6 +55,7 @@ static void em5_cleanup(void)
 	em5_dataloop_free();
 	em5_dma_free();
 	em5_buf_free(&buf);
+	
 	return;
 }
 
@@ -82,7 +83,7 @@ static int __init em5_init(void)
 	
 	pr_info( MODULE_NAME " has been loaded.\n" );
 	
-	PDEBUG("reset the bus");
+	PDEBUG("bus reset.");
 	xlbus_reset(); // generate OS (bus reset)
 	xlbus_irq_ena(TRUE);
 	xlbus_busy(FALSE);

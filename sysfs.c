@@ -21,7 +21,7 @@ struct platform_device *pdev;
 
 extern volatile READOUT_STATE readout_state;
 extern struct spill_stats sstats;
-extern wait_queue_head_t running_q, complete_q, error_q;
+extern wait_queue_head_t start_q, stop_q;
 
 ///-- counts --
 static ssize_t counts_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -77,43 +77,27 @@ static ssize_t force_stop_store(struct device * dev, struct device_attribute *at
 	readout_stop();
 	return n;
 }
-
 static DEVICE_ATTR(force_stop, 0666, force_stop_show, force_stop_store);
 
 
-
-
-static ssize_t wait_running_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t wait_start_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	if (wait_event_interruptible(running_q, readout_state==RUNNING || readout_state == PENDING) )
+	if (wait_event_interruptible(start_q, readout_state == RUNNING || readout_state == PENDING) )
 		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 
 	return sprintf(buf,".");
 }
+static DEVICE_ATTR(wait_start, 0444, wait_start_show, NULL);
 
-static DEVICE_ATTR(wait_running, 0444, wait_running_show, NULL);
 
-
-static ssize_t wait_complete_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t wait_stop_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	if (wait_event_interruptible(complete_q, readout_state==COMPLETE) )
+	if (wait_event_interruptible(stop_q, readout_state > PENDING) )
 		return -ERESTARTSYS; 
 
-	return sprintf(buf,".");
+	return sprintf(buf, readout_state_str());
 }
-
-static DEVICE_ATTR(wait_complete, 0444, wait_complete_show, NULL);
-
-
-static ssize_t wait_error_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	if (wait_event_interruptible(error_q, readout_state==ERROR) )
-		return -ERESTARTSYS;
-
-	return sprintf(buf,".");
-}
-
-static DEVICE_ATTR(wait_error, 0444, wait_error_show, NULL);
+static DEVICE_ATTR(wait_stop, 0444, wait_stop_show, NULL);
 
 
 #ifdef PXA_MSC_CONFIG
@@ -148,9 +132,8 @@ static struct attribute *_readout_attrs[] = {
 	&dev_attr_state.attr,
 	&dev_attr_counts.attr,
 	&dev_attr_stats.attr,
-	&dev_attr_wait_running.attr,
-	&dev_attr_wait_complete.attr,
-	&dev_attr_wait_error.attr,
+	&dev_attr_wait_start.attr,
+	&dev_attr_wait_stop.attr,
 	&dev_attr_force_start.attr,
 	&dev_attr_force_stop.attr,
 #ifdef PXA_MSC_CONFIG

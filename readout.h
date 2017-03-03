@@ -9,6 +9,7 @@ typedef enum {
 	RUNNING,  // FIFO readout
 	PENDING,  // between EndSpill and FIFOEmpty
 	COMPLETE,  // data ready, time for Peds, Leds, etc.
+	OVERFLOW,  // buffer overflow
 	ERROR,  // error state in MISS bus
 	} READOUT_STATE;
 
@@ -17,4 +18,5 @@ typedef enum {
 		"readout",\
 		"pending",\
 		"complete",\
+		"overflow",\
 		"error"

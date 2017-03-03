@@ -13,14 +13,12 @@
 #include "em5.h"
 #include "dataloop.h"
 #include "xlregs.h"
+#include "charfile.h"
 
 
 DECLARE_WAIT_QUEUE_HEAD(pending_q);  /// wait readout to finish
 static struct workqueue_struct * dataloop_wq;  /// a workqueue instead of kernel thread
-extern wait_queue_head_t dataready_q;
-
 extern struct spill_stats sstats;
-
 
 typedef struct {
 	struct work_struct work;
@@ -66,7 +64,7 @@ static void _dataloop(struct work_struct *work)
 		}
 
 		buf->count = words * sizeof(u32);
-		wake_up_interruptible(&dataready_q);
+		notify_readers();
 		
 		if (words >= wmax) break;  /// overflow
 		//~ 

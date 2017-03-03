@@ -29,6 +29,6 @@ enum bool {FALSE, TRUE};
 #define PDEBUG(format, args...)   printk(KERN_INFO MODULE_NAME": " format "\n" , ##args ) //TODO: replace with pr_devel (printk.h)
 #define PWARNING(format, args...) printk(KERN_WARNING MODULE_NAME": " format "\n"  , ##args) //pr_warn 
 #define PERROR(format, args...)   printk(KERN_ERR MODULE_NAME": " format "\n"  , ##args) //pr_err
-#define PDEVEL(format, args...)   printk(KERN_DEBUG MODULE_NAME": " format "\n"  , ##args) /*prints only when DEBUG flag is set */
+#define PDEVEL(format, args...)   printk(KERN_DEBUG MODULE_NAME": " format "\n"  , ##args)  /*prints only when DEBUG flag is set */
 
 #endif /* EM5_module_H */

@@ -19,6 +19,7 @@
 #include "xlregs.h"
 #include "em5.h"
 
+#include "charfile.h"
 #include "readout.h"
 
 #include "mach/irqs.h" /* IRQ_GPIO1 */
@@ -29,7 +30,6 @@ struct spill_stats sstats = {};
 struct run_stats   rstats = {};
 
 extern struct em5_buf buf;
-extern struct pid * pid_reader; 
 
 enum {CPU, DMA} readout_mode = CPU;
 unsigned int spill_id = 0;  /* global spill number */
@@ -51,9 +51,8 @@ const char * readout_state_str( void) {
 DEFINE_MUTEX(readout_mux);
 
 DECLARE_WAIT_QUEUE_HEAD(dataready_q);  // waiting for new data
-DECLARE_WAIT_QUEUE_HEAD(running_q);  // threads waiting for next spill readout
-DECLARE_WAIT_QUEUE_HEAD(complete_q);  // waiting for readout complete
-DECLARE_WAIT_QUEUE_HEAD(error_q);  // waiting for error condition
+DECLARE_WAIT_QUEUE_HEAD(start_q);  // waiting for readout start
+DECLARE_WAIT_QUEUE_HEAD(stop_q);  // waiting for readout completion
 
 void _do_work_bs(struct work_struct *work) 
 {
@@ -113,9 +112,6 @@ void readout_start(void)
 /** Begin FIFO readout.
  */
 {
-	int kill_err = 0;
-	struct task_struct * reader;
-	
 	if (mutex_trylock(&readout_mux) == 0)  // 0 -- failed, 1 -- locked
         return;
         
@@ -123,18 +119,8 @@ void readout_start(void)
 	spill_id += 1;
 	readout_state = RUNNING;
 	
-	if (pid_reader != NULL) {
-		/* Send a signal to the active reader 
-		 * (a process which mmapped the memory buffer or opened the charfile) */
-		reader = pid_task(pid_reader, PIDTYPE_PID);
-		kill_err = send_sig(SIGUSR1, reader, 0 /*priv*/ );
-	}
-	if (kill_err) {
-		PWARNING("sending signal active reader failed, PID: %d ",
-				pid_nr(pid_reader));
-	}
-
-	buf.count = 0;  ///reset buffer
+	kill_readers();  /// send signal to active readers
+	buf.count = 0;  /// reset buffer
 	
 	if (param_dma_readout) {
 		readout_mode = DMA;
@@ -146,8 +132,7 @@ void readout_start(void)
 	}
 	
 	xlbus_trig_ena(TRUE);  ///enable trigger input
-	
-	wake_up_interruptible(&running_q);  /// wake up processes waiting for data
+	wake_up_interruptible(&start_q);  /// wake up processes waiting for data
 }
 
 
@@ -174,14 +159,17 @@ int readout_stop(void)  /// can sleep
 	if (sstats.unexpected_es_irq)
 		PWARNING("ES irq unexpected: %d ", sstats.unexpected_es_irq);
 	
-	if (xlbus_is_error()) {
+	if (xlbus_is_error())
 		readout_state = ERROR;
-		wake_up_interruptible(&error_q); /// wake up processes waiting for readout error
-	}
-	else {
+	
+	else if (buf.count == buf.size)
+		readout_state = OVERFLOW;
+	else 
 		readout_state = COMPLETE;
-		wake_up_interruptible(&complete_q);  /// wake up processes waiting for readout complete
-	}
+	
+	notify_readers();
+	
+	wake_up_interruptible(&stop_q);  /// wake up processes waiting for readout complete
 	mutex_unlock(&readout_mux);
 	return 0;
 }

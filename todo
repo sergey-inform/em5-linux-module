@@ -1,9 +1,9 @@
 
-* async notification
-* refactor queues (wait err -> wait_start, wait_finish)
-* check spill_id
-* kill old readers on new spill
++ async notification
++ refactor queues (wait err -> wait_start, wait_finish)
++ kill old readers on new spill
 * fix dataloop (make more clever)
++ overflow status
 
 
 

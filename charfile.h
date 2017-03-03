@@ -3,6 +3,7 @@
 
 int em5_charfile_init( int major, int minor);
 void em5_charfile_free( void);
-//mmap
+void notify_readers( void);
+void kill_readers( void);
 
 #endif /*EM5_charfile_H*/

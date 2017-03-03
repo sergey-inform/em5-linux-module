@@ -21,13 +21,14 @@ static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};
 
 struct pid * pid_reader = NULL; //TODO: make a list of readers
+struct fasync_struct * async_queue = NULL; /* asynchronous readers */
 
 extern volatile READOUT_STATE readout_state;
 extern struct em5_buf buf;
-extern wait_queue_head_t dataready_q, running_q, complete_q, error_q;
+extern wait_queue_head_t dataready_q, start_q, stop_q;
 extern unsigned int spill_id;
 
-struct em5_open_data {
+struct em5_fopen_data {
 	unsigned int spill_id;
 };
 
@@ -35,7 +36,7 @@ static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 {
 	long long newpos;
 	
-	PDEBUG("llseek %d", whence);
+	PDEVEL("llseek %d", whence);
 	switch(whence)
 	{
 	case SEEK_SET:
@@ -112,7 +113,37 @@ static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 //~ }
 
 
-// em5_fop_read
+void notify_readers(void)
+/** Notify active readers on new data.
+ */
+{
+	if (async_queue) {
+		kill_fasync(&async_queue, SIGIO, POLL_IN);
+		PDEVEL("async notify");
+	}
+	wake_up_interruptible(&dataready_q);
+}
+
+void kill_readers(void)
+/** Terminate (by default) active readers.
+ *  Called on new spill.
+ */
+{
+	struct task_struct * reader;
+	int kill_err = 0;
+	
+	if (pid_reader != NULL) {
+		/* Send a signal to the active reader 
+		 * (a process which mmapped the memory buffer or opened the charfile) */
+		reader = pid_task(pid_reader, PIDTYPE_PID);
+		kill_err = send_sig(SIGUSR1, reader, 0 /*priv*/ );
+	}
+	
+	if (kill_err) {
+		PWARNING("sending signal active reader failed, PID: %d ",
+				pid_nr(pid_reader));
+	}
+}
 
 void em5_vm_open(struct vm_area_struct *vma)
 {
@@ -135,7 +166,9 @@ static int em5_fop_mmap (struct file *filp, struct vm_area_struct *vma)
 
 static int em5_fop_open (struct inode *inode, struct file *filp)
 {
-	struct em5_open_data * fildata; 
+	struct em5_fopen_data * fildata; 
+	
+	PDEVEL("open()");
 	
 	if (filp->f_flags & O_NONBLOCK)
 		return -EAGAIN;
@@ -146,21 +179,32 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 	
 	pid_reader = get_task_pid(current, PIDTYPE_PID);
 	
-	fildata = kzalloc(sizeof(struct em5_open_data), GFP_KERNEL);
+	fildata = kzalloc(sizeof(struct em5_fopen_data), GFP_KERNEL);
 	fildata->spill_id = spill_id;
 	filp->private_data = fildata;
 	
-	PDEBUG("charfile opened by reader,  PID: %d, spill_id: %d ", pid_nr(pid_reader), fildata->spill_id);
+	PDEVEL("charfile opened by reader,  PID: %d, spill_id: %d ", pid_nr(pid_reader), fildata->spill_id);
 	return 0;
+}
+
+
+static int em5_fop_fasync(int fd, struct file *filp, int mode)
+/** For async readers (LDD3, chapter 6).
+ */
+{
+	PDEVEL("fasync");
+	return fasync_helper(fd, filp, mode, &async_queue);
 }
 
 
 static int em5_fop_release (struct inode *inode, struct file *filp)
 {
-	struct em5_open_data * fildata;
+	struct em5_fopen_data * fildata;
 	struct pid * pid;
 	
-	fildata = (struct em5_open_data *)filp->private_data;
+	em5_fop_fasync(-1, filp, 0);  /// remove this filp from the asynchronously notified filp's
+	
+	fildata = (struct em5_fopen_data *)filp->private_data;
 	if (fildata)
 		kfree(fildata);
 	
@@ -176,11 +220,11 @@ static int em5_fop_release (struct inode *inode, struct file *filp)
 static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count, loff_t *f_pos)
 {
 	void * rp;
-	struct em5_open_data * fildata;
+	READOUT_STATE prev_state;
+	struct em5_fopen_data * fildata;
 	
-	//~ PDEBUG("read() cnt: %d  flags:%X ", count, filp->f_flags);
-	if (readout_state == STOPPED){
-		if (wait_event_interruptible(running_q, readout_state != STOPPED ) )
+	if (readout_state == STOPPED) {  /// module just loaded, no data in buffer
+		if (wait_event_interruptible(start_q, readout_state != STOPPED ) )
 			return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 	}
 	
@@ -190,24 +234,36 @@ static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count,
 	
 	rp = (void *) (buf.vaddr + *f_pos);
 	
-	while (*f_pos >= buf.count) {
-		switch(readout_state)
+	if (*f_pos > buf.count) {
+		PWARNING("f_pos > buf.count");
+		return 0;
+	}
+	
+	while (*f_pos == buf.count) {
+		
+		prev_state = readout_state;
+		
+		switch(prev_state)
 		{
 		case RUNNING:
 		case PENDING:
 			/// wait for a new data
-			if(wait_event_interruptible(dataready_q, TRUE /*condition*/ ))
+			if(wait_event_interruptible(dataready_q, *f_pos < buf.count || prev_state != readout_state )) {
 				return -ERESTARTSYS;
+			}
+			if (prev_state != readout_state)
+				PDEVEL("brake wait read() -- state changed, %s", readout_state_str());
 			break;
 
 		case ERROR:
 		case COMPLETE:
+		case OVERFLOW:
 			/// no more data
 			return 0;
 		
 		case STOPPED:
 		default:
-			PERROR("unexpected readout_state during read(): %s", readout_state_str());
+			PWARNING("unexpected readout_state during read(): %s", readout_state_str());
 			return -EFAULT;
 		}
 	}
@@ -231,6 +287,7 @@ static struct file_operations fops = {
 	//~ .unlocked_ioctl	= em5_fop_ioctl,
 	.llseek		= em5_fop_llseek,
 	.read		= em5_fop_read,
+	.fasync     = em5_fop_fasync,
 };
 
 int em5_charfile_init (int major, int minor)
@@ -247,13 +304,13 @@ int em5_charfile_init (int major, int minor)
 	}
 	
 	if (ret < 0) {
-		PDEBUG( "can't register chardev major number %d!", MAJOR(c_devno));
+		PERROR( "can't register chardev major number %d!", MAJOR(c_devno));
 		return ret;
 	}
 	
 	c_dev = cdev_alloc();
 	if (c_dev == NULL) {
-		PDEBUG( "can't allocate cdev!");
+		PERROR( "can't allocate cdev!");
 		return -ENOMEM;
 	}
 	
@@ -262,7 +319,7 @@ int em5_charfile_init (int major, int minor)
 	
 	ret = cdev_add( c_dev, c_devno, 1);
 	if (ret) {
-		PDEBUG("adding device to the system failed with error %d.", ret);
+		PERROR("adding device to the system failed with error %d.", ret);
 		return ret;
 	}
 	return 0;
