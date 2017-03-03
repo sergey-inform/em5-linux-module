@@ -8,6 +8,7 @@
 #include <linux/mm.h>  /* vma */
 #include <asm/uaccess.h>  /* access_ok */
 #include <linux/sched.h>  /* TASK_INTERRUPTIBLE */
+#include <linux/slab.h>
 
 #include "module.h"
 #include "charfile.h"
@@ -19,18 +20,22 @@
 static dev_t c_devno = 0;	// major and minor numbers
 static struct cdev * c_dev = {0};
 
-DECLARE_WAIT_QUEUE_HEAD(openq);
-
 struct pid * pid_reader = NULL; //TODO: make a list of readers
 
 extern volatile READOUT_STATE readout_state;
-
 extern struct em5_buf buf;
+extern wait_queue_head_t dataready_q, running_q, complete_q, error_q;
+extern unsigned int spill_id;
+
+struct em5_open_data {
+	unsigned int spill_id;
+};
 
 static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 {
 	long long newpos;
 	
+	PDEBUG("llseek %d", whence);
 	switch(whence)
 	{
 	case SEEK_SET:
@@ -124,34 +129,42 @@ struct vm_operations_struct em5_vm_ops = {
 static int em5_fop_mmap (struct file *filp, struct vm_area_struct *vma)
 {
 	vma->vm_ops = &em5_vm_ops;
-	//~ pr_devel("file mmap\n");
 	return em5_buf_mmap(&buf, vma);
 }
 
 
 static int em5_fop_open (struct inode *inode, struct file *filp)
 {
+	struct em5_open_data * fildata; 
+	
 	if (filp->f_flags & O_NONBLOCK)
 		return -EAGAIN;
 	
-	//TODO: lock semaphore here
-	if (pid_reader && pid_task(pid_reader, PIDTYPE_PID)) { //someone already reads
+	if (pid_reader && pid_task(pid_reader, PIDTYPE_PID)) {  //someone already reads
 		return -EBUSY;
 	}
 	
-	if (wait_event_interruptible(openq, readout_state==READOUT) )
-		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
-	
 	pid_reader = get_task_pid(current, PIDTYPE_PID);
 	
-	//: unlock semaphore
-	pr_devel("charfile opened by reader,  PID: %d\n", pid_nr(pid_reader));
+	fildata = kzalloc(sizeof(struct em5_open_data), GFP_KERNEL);
+	fildata->spill_id = spill_id;
+	filp->private_data = fildata;
+	
+	PDEBUG("charfile opened by reader,  PID: %d, spill_id: %d ", pid_nr(pid_reader), fildata->spill_id);
 	return 0;
 }
 
+
 static int em5_fop_release (struct inode *inode, struct file *filp)
 {
-	struct pid * pid  = get_task_pid(current, PIDTYPE_PID); 
+	struct em5_open_data * fildata;
+	struct pid * pid;
+	
+	fildata = (struct em5_open_data *)filp->private_data;
+	if (fildata)
+		kfree(fildata);
+	
+	pid  = get_task_pid(current, PIDTYPE_PID); 
 	if (pid_reader == pid) {
 		pid_reader = NULL;
 		pr_devel("carfile closed, unset reader PID: %d\n", pid_nr(pid));
@@ -163,15 +176,42 @@ static int em5_fop_release (struct inode *inode, struct file *filp)
 static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count, loff_t *f_pos)
 {
 	void * rp;
+	struct em5_open_data * fildata;
 	
-	if (wait_event_interruptible(openq, readout_state!=STOPPED ) )
-		return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
+	//~ PDEBUG("read() cnt: %d  flags:%X ", count, filp->f_flags);
+	if (readout_state == STOPPED){
+		if (wait_event_interruptible(running_q, readout_state != STOPPED ) )
+			return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
+	}
+	
+	fildata = filp->private_data;
+	if (fildata->spill_id != spill_id)  /// a new spill, old data is overwritten already
+		return -EIO;
 	
 	rp = (void *) (buf.vaddr + *f_pos);
 	
-	if (*f_pos > buf.count)
-		return -EFAULT;
+	while (*f_pos >= buf.count) {
+		switch(readout_state)
+		{
+		case RUNNING:
+		case PENDING:
+			/// wait for a new data
+			if(wait_event_interruptible(dataready_q, TRUE /*condition*/ ))
+				return -ERESTARTSYS;
+			break;
+
+		case ERROR:
+		case COMPLETE:
+			/// no more data
+			return 0;
 		
+		case STOPPED:
+		default:
+			PERROR("unexpected readout_state during read(): %s", readout_state_str());
+			return -EFAULT;
+		}
+	}
+	
 	count = min(count, (size_t)(buf.count - *f_pos));
 	
 	if (copy_to_user(ubuf, rp, count)) {
@@ -197,25 +237,23 @@ int em5_charfile_init (int major, int minor)
 {
 	int ret;
 	
-	//~ init_waitqueue_head(&openq);
-	
 	if (!major) {
 		/// get dynamic major
 		ret = alloc_chrdev_region(&c_devno, minor, 1, MODULE_NAME);
-		PDEVEL( "chardev got major %d.", MAJOR(c_devno));
+		PDEBUG( "chardev got major %d.", MAJOR(c_devno));
 	} else {
 		c_devno = MKDEV(major, minor);
 		ret = register_chrdev_region( c_devno, 1, MODULE_NAME);
 	}
 	
 	if (ret < 0) {
-		PDEVEL( "can't register chardev major number %d!", MAJOR(c_devno));
+		PDEBUG( "can't register chardev major number %d!", MAJOR(c_devno));
 		return ret;
 	}
 	
 	c_dev = cdev_alloc();
 	if (c_dev == NULL) {
-		PDEVEL( "can't allocate cdev!");
+		PDEBUG( "can't allocate cdev!");
 		return -ENOMEM;
 	}
 	
@@ -224,7 +262,7 @@ int em5_charfile_init (int major, int minor)
 	
 	ret = cdev_add( c_dev, c_devno, 1);
 	if (ret) {
-		PDEVEL("adding device to the system failed with error %d.", ret);
+		PDEBUG("adding device to the system failed with error %d.", ret);
 		return ret;
 	}
 	return 0;

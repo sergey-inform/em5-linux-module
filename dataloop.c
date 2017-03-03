@@ -15,8 +15,11 @@
 #include "xlregs.h"
 
 
-DECLARE_WAIT_QUEUE_HEAD(pending_wait);  /// wait readout to finish
+DECLARE_WAIT_QUEUE_HEAD(pending_q);  /// wait readout to finish
 static struct workqueue_struct * dataloop_wq;  /// a workqueue instead of kernel thread
+extern wait_queue_head_t dataready_q;
+
+extern struct spill_stats sstats;
 
 
 typedef struct {
@@ -40,13 +43,19 @@ static void _dataloop(struct work_struct *work)
 	unsigned wmax = buf->size / sizeof(u32);
 	unsigned * addr = (u32*)buf->vaddr;
 	
+	unsigned wfifo_full = WRCOUNT_MASK - WRCOUNT_MASK / 8;
+	
 	dwork->running = TRUE;
+	
 	while (dwork->started)
 	{
 		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
-		// if 3f6 -> stats_fifo_full++  /// count fifo full events
 		
-		if (words + wcount > wmax) {  /// overflow
+		if (wcount >= wfifo_full) {
+			sstats.fifo_fulls += 1;
+		}
+		
+		if (words + wcount > wmax) {  /// buffer overflow
 			wcount = wmax - words;
 		}
 		
@@ -57,16 +66,18 @@ static void _dataloop(struct work_struct *work)
 		}
 
 		buf->count = words * sizeof(u32);
+		wake_up_interruptible(&dataready_q);
 		
 		if (words >= wmax) break;  /// overflow
+		//~ 
+		//~ if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
 		
-		if (STAT_FF_EMPTY & ioread32(XLREG_STAT)) {
-			schedule(); ///take a nap
-		}
+		schedule(); ///take a nap
+		//~ }
 	}
 	
 	dwork->running = FALSE;
-	wake_up_interruptible(&pending_wait);
+	wake_up_interruptible(&pending_q);
 }
 
 
@@ -95,7 +106,7 @@ unsigned int dataloop_stop(void)
 	dataloop_work->started = FALSE;
 	PDEBUG("stopping fifo readout");
 
-	wait_event_interruptible(pending_wait, !dataloop_work->running);
+	wait_event_interruptible(pending_q, !dataloop_work->running);
 	
 	bytes = dataloop_work->buf->count;
 	PDEBUG("bytes = %d", bytes);

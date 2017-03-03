@@ -60,10 +60,19 @@ void xlbus_reset() {
 }
 
 xlbus_counts xlbus_counts_get(void)
-/* Get EM5 counters */
+/** Get EM5 counters */
 {
 	xlbus_counts val = (xlbus_counts) ioread32(XLREG_COUNTR);
 	return val;
+}
+
+bool xlbus_is_error(void)
+/** Return true on MISS error.
+ */
+{
+	if (STAT_MISS_ERR & ioread32(XLREG_STAT))
+		return TRUE;
+	return FALSE;
 }
 
 // FIXME: spinlock for control register

@@ -29,11 +29,10 @@ struct spill_stats sstats = {};
 struct run_stats   rstats = {};
 
 extern struct em5_buf buf;
-extern wait_queue_head_t openq;
 extern struct pid * pid_reader; 
 
 enum {CPU, DMA} readout_mode = CPU;
-unsigned int spill_id;  /* global spill number */
+unsigned int spill_id = 0;  /* global spill number */
 
 volatile READOUT_STATE readout_state = STOPPED;
 
@@ -44,12 +43,17 @@ extern ulong xlbase; /** note: here we use it as dev_id (a cookie for callbacks)
 static struct workqueue_struct * irq_wq; ///workqueue for irq bootom half (for BS/ES events)
 struct work_struct work_bs, work_es;
 
-DEFINE_MUTEX(readout_mux);
-
 static const char * readout_state_strings[] = {READOUT_STATE_STRINGS};
 const char * readout_state_str( void) {
 	return readout_state_strings[readout_state];
 }
+
+DEFINE_MUTEX(readout_mux);
+
+DECLARE_WAIT_QUEUE_HEAD(dataready_q);  // waiting for new data
+DECLARE_WAIT_QUEUE_HEAD(running_q);  // threads waiting for next spill readout
+DECLARE_WAIT_QUEUE_HEAD(complete_q);  // waiting for readout complete
+DECLARE_WAIT_QUEUE_HEAD(error_q);  // waiting for error condition
 
 void _do_work_bs(struct work_struct *work) 
 {
@@ -84,7 +88,7 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	}
 	if (flags & IFR_ES) {
 		switch(readout_state) {
-			case READOUT:
+			case RUNNING:
 				queue_work( irq_wq, (struct work_struct *)&work_es );
 			default:
 				sstats.unexpected_es_irq += 1;
@@ -109,7 +113,6 @@ void readout_start(void)
 /** Begin FIFO readout.
  */
 {
-	
 	int kill_err = 0;
 	struct task_struct * reader;
 	
@@ -117,8 +120,8 @@ void readout_start(void)
         return;
         
     memset(&sstats, 0, sizeof(sstats)); /// flush spill statistics
-	
-	readout_state = READOUT;
+	spill_id += 1;
+	readout_state = RUNNING;
 	
 	if (pid_reader != NULL) {
 		/* Send a signal to the active reader 
@@ -144,13 +147,12 @@ void readout_start(void)
 	
 	xlbus_trig_ena(TRUE);  ///enable trigger input
 	
-	wake_up_interruptible(&openq);  // ->readout_q
+	wake_up_interruptible(&running_q);  /// wake up processes waiting for data
 }
 
 
 int readout_stop(void)  /// can sleep
 /** Finish FIFO readout.
- * 
  */
 {
 	unsigned int cnt = 0;
@@ -172,9 +174,14 @@ int readout_stop(void)  /// can sleep
 	if (sstats.unexpected_es_irq)
 		PWARNING("ES irq unexpected: %d ", sstats.unexpected_es_irq);
 	
-	readout_state = COMPLETE;
-	//~ wake_up_interruptible(&openq);  /// wake up complete_q
-	
+	if (xlbus_is_error()) {
+		readout_state = ERROR;
+		wake_up_interruptible(&error_q); /// wake up processes waiting for readout error
+	}
+	else {
+		readout_state = COMPLETE;
+		wake_up_interruptible(&complete_q);  /// wake up processes waiting for readout complete
+	}
 	mutex_unlock(&readout_mux);
 	return 0;
 }

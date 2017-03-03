@@ -6,7 +6,7 @@ const char * readout_state_str( void);
 
 typedef enum {
 	STOPPED,  // after init
-	READOUT,  // FIFO readout
+	RUNNING,  // FIFO readout
 	PENDING,  // between EndSpill and FIFOEmpty
 	COMPLETE,  // data ready, time for Peds, Leds, etc.
 	ERROR,  // error state in MISS bus
