@@ -15,6 +15,7 @@
 #include "em5.h"
 #include "readout.h"
 #include "xlregs.h" //DELME
+#include "buf.h" //DELME
 
 
 struct platform_device *pdev;
@@ -22,6 +23,7 @@ struct platform_device *pdev;
 extern volatile READOUT_STATE readout_state;
 extern struct spill_stats sstats;
 extern wait_queue_head_t start_q, stop_q;
+extern struct em5_buf buf;
 
 ///-- counts --
 static ssize_t counts_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -33,12 +35,20 @@ static DEVICE_ATTR(counts, 0444, counts_show, NULL);
 
 
 ///-- stats --
-static ssize_t stats_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t stats_show(struct device *dev, struct device_attribute *attr, char *buff)
 {
 	//~ if (wait_event_interruptible(complete_q, readout_state==COMPLETE) )
 		//~ return -ERESTARTSYS; /* got signal: tell the fs layer to handle it */
 	
-	return sprintf(buf,"bytes %d \nff %d \nbursts %d \n", sstats.bytes, sstats.fifo_fulls, sstats.bursts_count);
+	//~ return sprintf(buf,"bytes %d \nff %d \nbursts %d \n", sstats.bytes, sstats.fifo_fulls, sstats.bursts_count);
+	return sprintf(buff, 
+			"bytes %lu \nff %d \nbursts %d \n"
+			"state %s\n",
+			 buf.count,
+			 sstats.fifo_fulls,
+			 sstats.bursts_count,
+			 readout_state_str()
+			 );
 }
 static DEVICE_ATTR(stats, 0444, stats_show, NULL);
 

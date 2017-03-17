@@ -1,9 +1,6 @@
 
-+ async notification
-+ refactor queues (wait err -> wait_start, wait_finish)
-+ kill old readers on new spill
-* fix dataloop (make more clever)
-+ overflow status
+* netsend - readout via network (async reader);
+* in dataloop schedule -> usleep (calculate minimum sleep time); 
 
 
 

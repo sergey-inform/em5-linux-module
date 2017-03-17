@@ -50,7 +50,8 @@ default:
 endif
 
 install: $(TARGET).ko
-	scp -P 2223 $(TARGET).ko root@10.0.2.2:/root/ 
+	#scp -P 2223 $(TARGET).ko root@10.0.2.2:/root/ 
+	scp $(TARGET).ko root@172.22.1.1:/root/ 
 #	install -d $(INSTALLDIR1)
 #	install -d $(INSTALLDIR2)
 #	install -c $(TARGET).ko $(INSTALLDIR1)

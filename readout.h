@@ -5,7 +5,7 @@ int readout_stop( void);
 const char * readout_state_str( void);
 
 typedef enum {
-	STOPPED,  // after init
+	INIT,  // after init
 	RUNNING,  // FIFO readout
 	PENDING,  // between EndSpill and FIFOEmpty
 	COMPLETE,  // data ready, time for Peds, Leds, etc.
@@ -14,7 +14,7 @@ typedef enum {
 	} READOUT_STATE;
 
 #define READOUT_STATE_STRINGS \
-		"stopped",\
+		"initial",\
 		"readout",\
 		"pending",\
 		"complete",\

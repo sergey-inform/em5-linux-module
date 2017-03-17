@@ -41,22 +41,22 @@ static void _dataloop(struct work_struct *work)
 	unsigned wmax = buf->size / sizeof(u32);
 	unsigned * addr = (u32*)buf->vaddr;
 	
-	unsigned wfifo_full = WRCOUNT_MASK - WRCOUNT_MASK / 8;
-	unsigned wfifo_burst = 64;
+	unsigned wfifo_high = WRCOUNT_MASK - WRCOUNT_MASK / 8;
+	unsigned wfifo_low = 64;
 	
 	dwork->running = TRUE;
 	
 	do {
 		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
 		
-		if (wcount < wfifo_burst) {
-			schedule();   /// take a nap
+		if (wcount < wfifo_low) {
+			schedule();   /// it's safe to take a nap
 			wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
 		}
 		
 		sstats.bursts_count += 1;
 		
-		if (wcount >= wfifo_full) {
+		if (wcount >= wfifo_high) {
 			sstats.fifo_fulls += 1;
 		}
 		
@@ -106,7 +106,8 @@ unsigned int dataloop_stop(void)
 	dataloop_work->started = FALSE;
 	PDEBUG("stopping fifo readout");
 
-	wait_event_interruptible(pending_q, !dataloop_work->running);
+	if (dataloop_work->running)
+		wait_event_interruptible(pending_q, !dataloop_work->running);
 	
 	bytes = dataloop_work->buf->count;
 	PDEBUG("bytes = %d", bytes);

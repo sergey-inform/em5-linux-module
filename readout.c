@@ -34,7 +34,7 @@ extern struct em5_buf buf;
 enum {CPU, DMA} readout_mode = CPU;
 unsigned int spill_id = 0;  /* global spill number */
 
-volatile READOUT_STATE readout_state = STOPPED;
+volatile READOUT_STATE readout_state = INIT;
 
 extern bool param_dma_readout;
 extern ulong xlbase; /** note: here we use it as dev_id (a cookie for callbacks)
@@ -112,8 +112,10 @@ void readout_start(void)
 /** Begin FIFO readout.
  */
 {
-	if (mutex_trylock(&readout_mux) == 0)  // 0 -- failed, 1 -- locked
+	if (mutex_trylock(&readout_mux) == 0){  // 0 -- failed, 1 -- locked
+		PDEVEL("Failed to lock readout_mux");
         return;
+	}
         
     memset(&sstats, 0, sizeof(sstats)); /// flush spill statistics
 	spill_id += 1;

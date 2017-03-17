@@ -223,8 +223,8 @@ static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count,
 	READOUT_STATE prev_state;
 	struct em5_fopen_data * fildata;
 	
-	if (readout_state == STOPPED) {  /// module just loaded, no data in buffer
-		if (wait_event_interruptible(start_q, readout_state != STOPPED ) )
+	if (readout_state == INIT) {  /// module just loaded, no data in buffer
+		if (wait_event_interruptible(start_q, readout_state != INIT ) )
 			return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
 	}
 	
