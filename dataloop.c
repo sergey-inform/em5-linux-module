@@ -65,14 +65,15 @@ static void _dataloop(struct work_struct *work)
 		while (wcount--)
 		{
 			*(addr + words) = ioread32(XLREG_DATA);
-			words++;
+			
+			/// Continue readout even if the buffer is full
+			/// to not to freeze other parts of DAQ system.
+			if (words < wmax) 
+				words++;	
 		}
 
 		buf->count = words * sizeof(u32);
 		notify_readers();
-		
-		if (words >= wmax)  /// buffer is full
-			break;  
 		
 	} while (dwork->started);
 	
