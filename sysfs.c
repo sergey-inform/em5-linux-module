@@ -42,7 +42,7 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 	
 	//~ return sprintf(buf,"bytes %d \nff %d \nbursts %d \n", sstats.bytes, sstats.fifo_fulls, sstats.bursts_count);
 	return sprintf(buff, 
-			"bytes %lu \nff %d \nbursts %d \n"
+			"bytes %lu \nff %d \nbursts %u \n"
 			"state %s\n",
 			 buf.count,
 			 sstats.fifo_fulls,
@@ -70,6 +70,7 @@ static ssize_t force_start_show(struct device *dev, struct device_attribute *att
 static ssize_t force_start_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
 {
 	readout_start();
+	//TODO: handle errors
 	return n;
 }
 
@@ -84,7 +85,9 @@ static ssize_t force_stop_show(struct device *dev, struct device_attribute *attr
 
 static ssize_t force_stop_store(struct device * dev, struct device_attribute *attr, const char * buf, size_t n)
 {
-	readout_stop();
+	ssize_t ret = readout_stop();
+	if (ret < 0)
+		return ret;
 	return n;
 }
 static DEVICE_ATTR(force_stop, 0666, force_stop_show, force_stop_store);

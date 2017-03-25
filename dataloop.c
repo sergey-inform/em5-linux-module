@@ -8,6 +8,7 @@
 
 #include <linux/delay.h>
 #include <asm/io.h>	/* ioread, iowrite */
+#include <linux/jiffies.h>
 
 #include "module.h"
 #include "em5.h"
@@ -33,47 +34,43 @@ static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
  */
 {
+#define JDIFF (HZ / 1000)    // ms
+
+	unsigned wcount;	// words in FIFO
 	dataloop_work_t * dwork = (dataloop_work_t *) work;
 	struct em5_buf * buf = dwork->buf;
-	
-	unsigned words = 0;  //counter
-	unsigned wcount;
-	unsigned wmax = buf->size / sizeof(u32);
-	unsigned * addr = (u32*)buf->vaddr;
-	
-	unsigned wfifo_high = WRCOUNT_MASK - WRCOUNT_MASK / 8;
-	unsigned wfifo_low = 64;
-	
+	u32 * ptr = (u32*)buf->vaddr;
+	u32 * lastptr = ptr + (buf->size / sizeof(u32)) - 1;  // the last word in buf
+	unsigned wfifo_high = WRCOUNT_MASK - WRCOUNT_MASK / 16;  // FIFO full on 94%
+	unsigned long jnext = 0;  // next time (in jiffies) to notify readers
+
 	dwork->running = TRUE;
 	
 	do {
-		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
-		
-		if (wcount < wfifo_low) {
-			schedule();   /// it's safe to take a nap
-			wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
-		}
-		
+		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));	
 		sstats.bursts_count += 1;
 		
 		if (wcount >= wfifo_high) {
 			sstats.fifo_fulls += 1;
 		}
 		
-		wcount = min(wcount, wmax-words);  /// prevent overflow
-		
 		while (wcount--)
 		{
-			*(addr + words) = ioread32(XLREG_DATA);
+			*(ptr) = ioread32(XLREG_DATA);
 			
 			/// Continue readout even if the buffer is full
 			/// to not to freeze other parts of DAQ system.
-			if (words < wmax) 
-				words++;	
+			if (ptr < lastptr) 
+				ptr++;	
 		}
 
-		buf->count = words * sizeof(u32);
-		notify_readers();
+		buf->count = (char*) ptr - (char*)buf->vaddr;
+		
+		/// throttle reader notifications
+		if (jiffies > jnext) {  // it's time to notify readers
+			notify_readers();
+			jnext = jiffies + JDIFF;
+		}
 		
 	} while (dwork->started);
 	
@@ -108,10 +105,11 @@ unsigned int dataloop_stop(void)
 	PDEBUG("stopping fifo readout");
 
 	if (dataloop_work->running)
-		wait_event_interruptible(pending_q, !dataloop_work->running);
+		if (wait_event_interruptible(pending_q, !dataloop_work->running)) //interrupted
+			return -EBUSY;
 	
 	bytes = dataloop_work->buf->count;
-	PDEBUG("bytes = %d", bytes);
+	PDEBUG("readout bytes: %d", bytes);
 	return bytes;
 }
 
@@ -139,7 +137,7 @@ int __init em5_dataloop_init( struct em5_buf * buf)
 	dataloop_work->buf = buf;
 	
 	INIT_WORK(&dataloop_work->work, _dataloop );
-	PDEBUG("dataloop_work->started %d", dataloop_work->started );
+	PDEBUG("dataloop_work init" );
 	
 	return 0;
 }

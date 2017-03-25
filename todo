@@ -1,7 +1,5 @@
 
-* netsend - readout via network (async reader);
-* in dataloop schedule -> usleep (calculate minimum sleep time); 
-
+* возврат корректных ошибок при вызове функций sysfs.
 
 
 /* 2 doc

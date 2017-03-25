@@ -16,7 +16,6 @@ typedef union {
 		u16 events;
 		u16 spills;
 	};
-	
 } xlbus_counts;
 
 xlbus_counts xlbus_counts_get(void);

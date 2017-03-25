@@ -76,7 +76,7 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	
 	if (flags & IFR_BS) {
 		switch(readout_state) {
-			case STOPPED:
+			case INIT:
 			case COMPLETE:
 				queue_work( irq_wq, (struct work_struct *)&work_bs );
 				break;
@@ -168,7 +168,6 @@ int readout_stop(void)  /// can sleep
 	else 
 		readout_state = COMPLETE;
 
-	PDEVEL("buf cnt %lu, sz %lu", buf.count, buf.size);
 	notify_readers();
 	
 	wake_up_interruptible(&stop_q);  /// wake up processes waiting for readout complete

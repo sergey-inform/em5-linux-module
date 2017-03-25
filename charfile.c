@@ -218,14 +218,15 @@ static int em5_fop_release (struct inode *inode, struct file *filp)
 }
 
 static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count, loff_t *f_pos)
+/** Note: if reading zero bytes, wait until new data. */
 {
 	void * rp;
 	READOUT_STATE prev_state;
 	struct em5_fopen_data * fildata;
 	
 	if (readout_state == INIT) {  /// module just loaded, no data in buffer
-		if (wait_event_interruptible(start_q, readout_state != INIT ) )
-			return -ERESTARTSYS; /* signal: tell the fs layer to handle it */
+		if (wait_event_interruptible(start_q, readout_state != INIT ) )  // wait for a start of readout
+			return -ERESTARTSYS; /* interrupted with signal: tell the fs layer to handle it */
 	}
 	
 	fildata = filp->private_data;
@@ -239,7 +240,7 @@ static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count,
 		return 0;
 	}
 	
-	while (*f_pos == buf.count) {
+	while (*f_pos == buf.count) {  // wait loop
 		
 		prev_state = readout_state;
 		
@@ -261,14 +262,14 @@ static ssize_t em5_fop_read (struct file *filp, char __user *ubuf, size_t count,
 			/// no more data
 			return 0;
 		
-		case STOPPED:
+		case INIT:
 		default:
 			PWARNING("unexpected readout_state during read(): %s", readout_state_str());
 			return -EFAULT;
 		}
 	}
 	
-	count = min(count, (size_t)(buf.count - *f_pos));
+	count = min(count, (size_t)(buf.count - *f_pos)); 
 	
 	if (copy_to_user(ubuf, rp, count)) {
 		return -EFAULT;
