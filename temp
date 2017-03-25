@@ -1,7 +1,0 @@
-uint param_spill_latency = 1000; // ms
-module_param_named( spill_latency, param_spill_latency, uint, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC( spill_latency, "How long the readout lasts after the end of spill.");
-
-
-
-

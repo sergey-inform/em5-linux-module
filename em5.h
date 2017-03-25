@@ -1,5 +1,6 @@
 /**
  * Header file for userspace apps and libraries. 
+ * Shared with libem5.
  */
 #ifndef EM5_H
 #define EM5_H
@@ -9,10 +10,6 @@
 #else
 #include <sys/ioctl.h>
 #endif
-
-#include <asm/atomic.h>
-
-#include <linux/slab.h>
 
 struct spill_stats {
 	unsigned int bytes;
@@ -28,7 +25,6 @@ struct run_stats {
 };
 
 typedef unsigned long emword;	/* EuroMISS word: addr+data */
-
 
 
 /**

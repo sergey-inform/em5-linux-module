@@ -1,0 +1,65 @@
+DMA flow-through, descriptor-fetch mode
+=======================================
+
+The DMA controller
+does not check the cache, so target and source addresses must be configured as non-cacheable in
+the memory management unit.
+
+For a descriptor-fetch transfer, DCSRx[STOPINTR] is cleared when the DMA
+controller updates the DDADRx register.
+
+1. clear the DCSRx[RUN] 
+2. clear the DCSRx[NODESCFETCH] bit
+3. write a valid descriptor address to the DDADRx 
+4. set DCSRx[RUN]
+	
+Bit [0] (STOP) of word [0] of a DMA descriptor (the low bit of the DDADRx field) marks the
+special descriptor, which resides at the end of a descriptor list. The value of the stop bit does not
+affect the loading of the fields of a descriptor into channel registers in any way; however, if a
+descriptor with the stop bit set is loaded into a channel register, then the channel stops after
+completely transferring the data pertaining to that channel.
+
+If the on-chip peripheral address resides in the DSADRx register, the DCMDx[FLOWSRC] bit must be set.
+
+DREQ
+-----
+The companion-chip requests are DREQ<2:0>. A request can be mapped to any of the eight channels in a priority set. The DMA controller detects a
+request by identifying a low-to-high transition on the DREQ.
+
+The DMA controller detects the positive edge of this signal to log a request. The external device asserts
+the DREQ<2:0> signals when a DMA transfer request is required. The DREQ<2:0> signals must remain
+asserted for four CLK_MEM cycles to allow the DMA controller to recognize the low-to-high transition
+(see Figure 5-2). When the DREQ<2:0> signals are de-asserted, they must remain so for at least four
+CLK_MEM cycles. The DMA controller registers the transition from low to high to identify a new request.
+
+It can have up to 31 outstanding requests on each of the DREQ<2:0> pins. The number of
+pending requests are logged in status registers, DRQSRx.
+
+Requests on pins DREQ<2> can be used for data transfers in flow-through mode only.
+
+DRCMR74 --- Request to Channel Map register for DREQ<2> (companion chip request 2) (0x4000_1128)
+
+When the request is recognized the following process begins:
+1. The DMA controller prompts the memory controller to read the required number of bytes
+addressed by DSADRx[31:0] into a 32-byte buffer in the DMA controller.
+2. The DMA controller transfers the data to the external device addressed in DTADRx[31:0].
+3. At the end of the transfer, DSADRx is increased and DCMDx[LEN] is decreased by the
+smaller of DCMDx[LEN] and DCMDx[SIZE].
+
+
+IRQ
+----
+If DCMDx[IRQEN] is set, a DMA interrupt is requested at the end of the last cycle associated with
+the byte that caused DCMDx[LEN] to decrement to zero.
+
+
+Memory-to-Memory Moves
+----
+Memory-to-memory moves do not involve request signals. For a memory-to-memory move, the processor writes to the DCSRx[RUN] bit indicated by the channel that is configured to perform a memory-to-memory move. The DCMDx[FLOWSRC] and DCMDx[FLOWTRG] bits must be cleared as soon as the descriptor is fetched. The transfer begins without waiting for any request signals.
+If DCMDx[IRQEN] is set, a DMA interrupt is requested at the end of the last cycle associated with the byte that caused DCMDx[LEN] to decrement to zero.
+
+
+
+
+
+REM: to make FIFO use "Descriptor Chain for Software Implementation of Full and Empty Bits"
