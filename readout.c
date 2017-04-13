@@ -154,8 +154,6 @@ int readout_stop(void)  /// can sleep
 		case CPU: cnt = dataloop_stop(); break;
 	}
 	
-	sstats.bytes = cnt;
-	
 	/// Finish readout
 	ptr = (u32*)((char*)buf.vaddr + cnt);
 	cnt += xlbus_fifo_read(ptr, buf.size - cnt);  /// read trailing fifo contents

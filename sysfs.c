@@ -40,15 +40,12 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 	//~ if (wait_event_interruptible(complete_q, readout_state==COMPLETE) )
 		//~ return -ERESTARTSYS; /* got signal: tell the fs layer to handle it */
 	
-	//~ return sprintf(buf,"bytes %d \nff %d \nbursts %d \n", sstats.bytes, sstats.fifo_fulls, sstats.bursts_count);
 	return sprintf(buff, 
 			"buf count %lu \n"
-			"stat bytes %u \n"
 			"ff %d \n"
 			"bursts %u \n"
 			"state %s\n",
 			 buf.count,
-			 sstats.bytes,
 			 sstats.fifo_fulls,
 			 sstats.bursts_count,
 			 readout_state_str()
