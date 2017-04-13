@@ -42,9 +42,13 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 	
 	//~ return sprintf(buf,"bytes %d \nff %d \nbursts %d \n", sstats.bytes, sstats.fifo_fulls, sstats.bursts_count);
 	return sprintf(buff, 
-			"bytes %lu \nff %d \nbursts %u \n"
+			"buf count %lu \n"
+			"stat bytes %u \n"
+			"ff %d \n"
+			"bursts %u \n"
 			"state %s\n",
 			 buf.count,
+			 sstats.bytes,
 			 sstats.fifo_fulls,
 			 sstats.bursts_count,
 			 readout_state_str()

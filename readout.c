@@ -31,7 +31,7 @@ struct run_stats   rstats = {};
 
 extern struct em5_buf buf;
 
-enum {CPU, DMA} readout_mode = CPU;
+enum {CPU, DMA} readout_mode = CPU;  // remember active mode
 unsigned int spill_id = 0;  /* global spill number */
 
 volatile READOUT_STATE readout_state = INIT;
@@ -126,7 +126,7 @@ void readout_start(void)
 	
 	if (param_dma_readout) {
 		readout_mode = DMA;
-		dma_readout_start();
+		dma_start();
 	}
 	else {
 		readout_mode = CPU;
@@ -149,7 +149,7 @@ int readout_stop(void)  /// can sleep
 	readout_state = PENDING;
 	switch (readout_mode)
 	{
-		case DMA: cnt = dma_readout_stop(); break;
+		case DMA: cnt = dma_stop(); break;
 		case CPU: cnt = dataloop_stop(); break;
 	}
 	

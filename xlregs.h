@@ -38,6 +38,7 @@ extern ulong xlbase_hw;
 #define STAT_SPILL  	(1<<1)
 #define STAT_IRQ  	(1<<2)
 #define STAT_MISS_ERR  	(1<<3)
+#define STAT_MISS_AP  	(1<<4)  
 
 /* Interrupt flag register */
 #define IFR_00		(1<<0)	// 

@@ -7,8 +7,11 @@
 #ifdef DMA_READOUT
 int em5_dma_init(struct em5_buf *);
 void em5_dma_free( void);
-int dma_readout_start(void);
-u32 dma_readout_stop(void);
+
+
+void dma_start(void);
+unsigned dma_stop(void);
+unsigned dma_count(void);
 
 #else
 static inline int em5_dma_init(struct em5_buf * buf)

@@ -9,6 +9,7 @@
 #include "module.h"
 #include "dma.h"
 #include "xlregs.h"
+#include "xlbus.h"
 
 #include <linux/version.h>
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 28)
@@ -46,27 +47,24 @@ static void dma_irq_handler( int channel, void *data)
 u32 _dma_calculate_count(void)
 {
 	int i;
-	dma_addr_t dtadr = DTADR(dma_chan);
 	unsigned count = 0;
+	dma_addr_t dtadr = DTADR(dma_chan);
 	
-	
-	u32 page_count, byte_count;
-	u32 ddadr, dinit;
-	ddadr = DDADR(dma_chan);
-	dinit = transfer.hw_desc_list;
+	u32 page_count;
+	u32 byte_count;
+	u32 ddadr = DDADR(dma_chan);
+	u32 dinit = transfer.hw_desc_list;
 	
 	// method 1
 	for (i=0; i< transfer.desc_count; i++) {
 		if (transfer.desc_list[i].dtadr == (dtadr & PAGE_MASK) ) { /// if target address in descritpor list
 			count = i * PAGE_SIZE + (dtadr & (PAGE_SIZE-1)); /// complete pages + offset
 		}
-	
 	}
 	
 	// method 2
 	page_count = (ddadr - dinit) / sizeof(*transfer.desc_list);
 	byte_count = page_count * PAGE_SIZE - (DCMD(dma_chan) & DCMD_LENGTH);
-	
 	
 	pr_info("dtadr: %X,  cnt: %d, cnt_old_method: %d\n",dtadr,  count, byte_count);
 	
@@ -101,15 +99,11 @@ void _dma_restart(void)
 #define DRQSR2 DMAC_REG(0xE8) /*DREQ2 Status Register*/
 #define DRQSR_CLR (1<<8)
 
-int dma_readout_start(void)
+void dma_start(void)
 {
-	u32 ctrl;
-	
 	//~ _dma_restart();
-	ctrl = ioread32(XLREG_CTRL);
 	DDADR(dma_chan) = transfer.hw_desc_list;
 	wmb();
-	
 	
 	pr_devel("dma_start: DCSR %X", DCSR(dma_chan));
 	
@@ -118,21 +112,21 @@ int dma_readout_start(void)
 		wmb();
 	}
 	
-	iowrite32(ctrl | DMA_ENA, XLREG_CTRL); /// Enable dreqs
-	
-	return 0;
+	xlbus_dreq_ena(true);   /// Enable dreqs
 }
 
-u32 dma_readout_stop(void)
+unsigned dma_stop(void)
 /* Returns a number of written bytes. */
 {
-	unsigned int count;
-	u32 dcsr = DCSR(dma_chan);
+	unsigned int count = 0;
 	int dreqs;
-	iowrite32( ioread32(XLREG_CTRL) & ~DMA_ENA, XLREG_CTRL); ///disable dreqs
+	u32 dcsr = DCSR(dma_chan);
+	
+	xlbus_dreq_ena(false);  ///disable dreqs
 	
 	if(dma_chan!=-1) {
 		DCSR(dma_chan) &= ~DCSR_RUN; ///stop dma channel
+		wmb();
 	}
 	
 	count = _dma_calculate_count();
@@ -141,11 +135,11 @@ u32 dma_readout_stop(void)
 	dreqs = 0x3f & DRQSR2;
 
 	if (dreqs)
-		pr_devel("non-handled dreqs!!!: %d", dreqs);
+		pr_debug("non-handled dreqs!!!: %d", dreqs);
+	
 	pr_devel("after stop: DDADR %X, DTADR:%X, DCSR %X", DDADR(dma_chan), DTADR(dma_chan), DCSR(dma_chan));
 	
 	
-
 #define DCSR_STR(flag) (dcsr & DCSR_##flag ? #flag" " : "")	
 	
 	dcsr = DCSR(dma_chan);
@@ -161,7 +155,9 @@ u32 dma_readout_stop(void)
 	return count;
 }
 
-
+unsigned dma_count(void) {
+	return _dma_calculate_count();
+}
 
 
 //em5_readout_finish(void)
@@ -219,10 +215,12 @@ u32 dma_readout_stop(void)
 	//~ pr_info("wake_up_interruptible - ok");
 	//~ return 0;
 
+
 int em5_dma_init( struct em5_buf * buf)
 {
 	int i = 0;
 	u32 dcmd = 0; /* command register value */
+	unsigned num_pages = buf->num_pages;
 	
 	/// Get dma channel
 	dma_chan = pxa_request_dma( MODULE_NAME, DMA_PRIO_HIGH,
@@ -236,8 +234,8 @@ int em5_dma_init( struct em5_buf * buf)
 	DRCMR(74) = DRCMR_MAPVLD | (dma_chan & DRCMR_CHLNUM); /// map DREQ<2> to selected channel
 	
 	/// Create descriptor list with buffer pages.
-	transfer.desc_count = buf->num_pages;
-	transfer.desc_len = buf->num_pages * sizeof(*transfer.desc_list);
+	transfer.desc_count = num_pages;
+	transfer.desc_len = num_pages * sizeof(*transfer.desc_list);
 	
 	transfer.desc_list = dma_alloc_coherent(dev, transfer.desc_len, &transfer.hw_desc_list, GFP_KERNEL);
 	if (transfer.desc_list == NULL) {
@@ -250,7 +248,7 @@ int em5_dma_init( struct em5_buf * buf)
 	dcmd |=  DCMD_WIDTH4 | DCMD_BURST32;
 	
 	/* build descriptor list */
-	for (i = 0; i < (buf->num_pages); i++) {
+	for (i = 0; i < (num_pages); i++) {
 		transfer.desc_list[i].dsadr = transfer.hw_addr;
 		transfer.desc_list[i].dtadr = dma_map_page(dev, buf->pages[i], 0 /*offset*/,
 				PAGE_SIZE, DMA_FROM_DEVICE);
@@ -259,9 +257,12 @@ int em5_dma_init( struct em5_buf * buf)
 		transfer.desc_list[i].dcmd  = dcmd | PAGE_SIZE;
 	}
 	
-	transfer.desc_list[buf->num_pages - 1].ddadr = DDADR_STOP;
+	transfer.desc_list[num_pages - 1].ddadr = DDADR_STOP;
+	/// Instead of STOP, loop readout to the last page (to not to freeze entire DAQ if overflow)
+	/// desc_list[last].ddadr = desc_list[last-1].ddadr  // --> (loop)
+	//~ transfer.desc_list[num_pages - 1].ddadr = transfer.desc_list[num_pages - 2].ddadr;
 	
-	DCSR(dma_chan) &= ~DCSR_RUN; //stop channel
+	DCSR(dma_chan) &= ~DCSR_RUN;  /// stop channel
 	wmb();
 	DSADR(dma_chan) = transfer.hw_addr;
 	DDADR(dma_chan) = transfer.hw_desc_list;
@@ -277,7 +278,9 @@ int em5_dma_init( struct em5_buf * buf)
 
 void em5_dma_free( void)
 {
-	dma_readout_stop();
+	dma_stop();
+	
+	pr_debug("dma_STOPPED");
 	
 	if (transfer.desc_list) {
 		dma_free_coherent(dev, transfer.desc_len, transfer.desc_list, transfer.hw_desc_list);

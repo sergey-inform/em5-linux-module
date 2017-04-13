@@ -1,6 +1,6 @@
 # Comment/uncomment the following line to enable/disable debugging
 DEBUG = y
-#~ DMA_READOUT = y
+DMA_READOUT = y
 
 INSTALLDIR1 :=/home/user/em5_rootfs_overlay/opt/
 INSTALLDIR2 :=/home/user/nfsroot/root/

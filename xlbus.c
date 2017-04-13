@@ -34,7 +34,6 @@ ulong mscbase_hw = 0;
 #define SET_BITS(p, bits, val) ( (val) ? (p)|(bits) : (p) & ~(bits))
 
 
-
 //~ int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	//~ 
 	//~ //check_size
@@ -103,6 +102,7 @@ void xlbus_irq_ena(bool val) {
 			XLREG_CTRL);
 }
 
+#define SET_BITS(p, bits, val) ( (val) ? (p)|(bits) : (p) & ~(bits))
 
 void xlbus_dreq_ena(bool val) {
 /** Enable/disable dma interrupts.

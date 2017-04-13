@@ -71,7 +71,7 @@ int em5_buf_init(struct em5_buf *buf, size_t size)
 	unsigned int sz;
 	buf->vaddr = NULL;
 	buf->num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT; //round a size to PAGE_SIZE
-	
+	buf->num_pages += 1;  /// add one extra page
 	
 	sz = buf->num_pages * sizeof(struct page *);
 	buf->pages = kzalloc(sz, GFP_KERNEL);
@@ -94,13 +94,12 @@ int em5_buf_init(struct em5_buf *buf, size_t size)
 	if (!buf->vaddr)
 		buf->vaddr = vm_map_ram(buf->pages, buf->num_pages, -1 /*node*/, PAGE_KERNEL);
 	
-	/*fill buffer */
+	/* fill the buffer */
 	for (i = 0; i < (buf->num_pages); i++) {
 		*(int*)(buf->vaddr + PAGE_SIZE * i) = i;
 	}
 	
-	
-	buf->size = buf->num_pages * PAGE_SIZE;
+	buf->size = (buf->num_pages - 1) * PAGE_SIZE;  //do not count an extra page
 	buf->count = 0;
 	
 	return 0;	

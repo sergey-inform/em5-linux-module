@@ -50,9 +50,9 @@ static void em5_cleanup(void)
 	em5_charfile_free(); 
 	em5_debugfs_free();
 	em5_readout_free();
-	em5_xlbus_free(); //TODO:  check, if it should bee freed before dma.
-	em5_dataloop_free();
 	em5_dma_free();
+	em5_dataloop_free();
+	em5_xlbus_free();  // it should bee freed after dma.
 	em5_buf_free(&buf);
 	
 	return;
