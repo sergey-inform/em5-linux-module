@@ -142,7 +142,8 @@ int readout_stop(void)  /// can sleep
 /** Finish FIFO readout.
  */
 {
-	unsigned int cnt = 0;
+	unsigned long cnt = 0;
+	u32 * ptr;
 	
 	xlbus_trig_ena(FALSE);  /// Disable trigger intput.
 	
@@ -155,6 +156,13 @@ int readout_stop(void)  /// can sleep
 	
 	sstats.bytes = cnt;
 	
+	/// Finish readout
+	ptr = (u32*)((char*)buf.vaddr + cnt);
+	cnt += xlbus_fifo_read(ptr, buf.size - cnt);  /// read trailing fifo contents
+	xlbus_fifo_flush();  /// flush the rest of fifo if no more space in buf
+	
+	buf.count = cnt; 
+	
 	if (sstats.unexpected_bs_irq)
 		PWARNING("BS irq unexpected: %d ", sstats.unexpected_bs_irq);
 		
@@ -163,7 +171,7 @@ int readout_stop(void)  /// can sleep
 	
 	if (xlbus_is_error())
 		readout_state = ERROR;
-	else if (buf.count == buf.size)
+	else if (buf.count >= buf.size)
 		readout_state = OVERFLOW;
 	else 
 		readout_state = COMPLETE;

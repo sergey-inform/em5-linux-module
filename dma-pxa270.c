@@ -68,7 +68,7 @@ u32 _dma_calculate_count(void)
 	
 	pr_info("dtadr: %X,  cnt: %d, cnt_old_method: %d\n",dtadr,  count, byte_count);
 	
-	return count;
+	return count;  // bytes
 }
 
 void _dma_restart(void) 
@@ -115,7 +115,7 @@ void dma_start(void)
 	xlbus_dreq_ena(true);   /// Enable dreqs
 }
 
-unsigned dma_stop(void)
+unsigned long dma_stop(void)
 /* Returns a number of written bytes. */
 {
 	unsigned int count = 0;

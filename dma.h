@@ -10,7 +10,7 @@ void em5_dma_free( void);
 
 
 void dma_start(void);
-unsigned dma_stop(void);
+unsigned long dma_stop(void);
 unsigned dma_count(void);
 
 #else

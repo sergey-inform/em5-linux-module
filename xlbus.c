@@ -58,6 +58,7 @@ void xlbus_reset() {
 	return;
 }
 
+
 xlbus_counts xlbus_counts_get(void)
 /** Get EM5 counters */
 {
@@ -109,6 +110,44 @@ void xlbus_dreq_ena(bool val) {
  */
 	iowrite32( SET_BITS( ioread32(XLREG_CTRL), DMA_ENA, val),
 			XLREG_CTRL);
+}
+
+unsigned xlbus_fifo_read(u32 * ptr, unsigned wmax)
+/** Get current contents of data FIFO.
+ *  If fifo contains more than wmax, flush the rest of the buffer.
+ *  Return: a number of bytes.
+ */
+{
+	u32 * pptr = ptr;
+	
+	unsigned wcount;
+	wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
+	wcount = min(wcount, wmax);
+	
+	while (wcount--)
+	{
+		*(pptr) = ioread32(XLREG_DATA);
+		pptr++;
+	}
+	
+	return (char*)pptr - (char*)ptr; 
+}
+
+unsigned xlbus_fifo_flush(void)
+/** Clear thes data FIFO contents.
+ */ 
+{
+	u32 data;
+	unsigned wcount;
+	unsigned bytes = 0;
+
+	while ((wcount = STAT_WRCOUNT(ioread32(XLREG_STAT))))
+	{
+		bytes += wcount * sizeof(data);
+		while (wcount--)
+			data = ioread32(XLREG_DATA);
+	}
+	return bytes;
 }
 
 

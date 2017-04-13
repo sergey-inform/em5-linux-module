@@ -9,6 +9,8 @@ void xlbus_busy(bool);
 void xlbus_trig_ena(bool);
 void xlbus_irq_ena(bool);
 void xlbus_dreq_ena(bool);
+unsigned xlbus_fifo_flush(void);
+unsigned xlbus_fifo_read(u32 * ptr, unsigned wmax);
 
 typedef union {
 	unsigned word;

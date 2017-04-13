@@ -30,6 +30,8 @@ typedef struct {
 
 dataloop_work_t * dataloop_work;
 
+
+//TODO: refactor, simplify
 static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
  */
@@ -46,6 +48,9 @@ static void _dataloop(struct work_struct *work)
 
 	dwork->running = TRUE;
 	
+	
+	
+	
 	do {
 		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));	
 		sstats.bursts_count += 1;
@@ -53,6 +58,9 @@ static void _dataloop(struct work_struct *work)
 		if (wcount >= wfifo_high) {
 			sstats.fifo_fulls += 1;
 		}
+		
+		// if count > wfifo_high
+		// 		sstats.fifo_fulls += 1;
 		
 		while (wcount--)
 		{
@@ -94,7 +102,7 @@ void dataloop_start(void * addr, unsigned max /* buffer length */)
 
 unsigned int dataloop_stop(void)
 {
-	unsigned int bytes = 0;
+	unsigned long bytes = 0;
 	
 	if (dataloop_work->running == FALSE) {
 		PWARNING("trying to stop fifo readout loop while not running");
@@ -109,7 +117,7 @@ unsigned int dataloop_stop(void)
 			return -EBUSY;
 	
 	bytes = dataloop_work->buf->count;
-	PDEBUG("readout bytes: %d", bytes);
+	PDEBUG("readout bytes: %lu", bytes);
 	return bytes;
 }
 
