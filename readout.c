@@ -78,6 +78,7 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 		switch(readout_state) {
 			case INIT:
 			case COMPLETE:
+			case OVERFLOW:
 				queue_work( irq_wq, (struct work_struct *)&work_bs );
 				break;
 			default:
@@ -156,7 +157,8 @@ int readout_stop(void)  /// can sleep
 	
 	/// Finish readout
 	ptr = (u32*)((char*)buf.vaddr + cnt);
-	cnt += xlbus_fifo_read(ptr, buf.size - cnt);  /// read trailing fifo contents
+	
+	cnt += 4 * xlbus_fifo_read(ptr, (buf.size - cnt)/sizeof(u32) );  /// read trailing fifo contents
 	xlbus_fifo_flush();  /// flush the rest of fifo if no more space in buf
 	
 	buf.count = cnt; 
@@ -177,6 +179,7 @@ int readout_stop(void)  /// can sleep
 	notify_readers();
 	
 	wake_up_interruptible(&stop_q);  /// wake up processes waiting for readout complete
+	
 	mutex_unlock(&readout_mux);
 	return 0;
 }

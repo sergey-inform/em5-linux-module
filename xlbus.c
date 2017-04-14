@@ -119,8 +119,11 @@ unsigned xlbus_fifo_read(u32 * ptr, unsigned wmax)
  */
 {
 	u32 * pptr = ptr;
-	
 	unsigned wcount;
+
+	if (wmax == 0)
+		return 0;
+	
 	wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));
 	wcount = min(wcount, wmax);
 	
