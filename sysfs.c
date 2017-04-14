@@ -16,7 +16,10 @@
 #include "readout.h"
 #include "xlregs.h" //DELME
 #include "buf.h" //DELME
+#include "dma.h" //DELME
 
+
+#include <linux/mutex.h>
 
 struct platform_device *pdev;
 
@@ -24,6 +27,8 @@ extern volatile READOUT_STATE readout_state;
 extern struct spill_stats sstats;
 extern wait_queue_head_t start_q, stop_q;
 extern struct em5_buf buf;
+extern enum {CPU, DMA} readout_mode;
+extern struct mutex readout_mux;
 
 ///-- counts --
 static ssize_t counts_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -40,12 +45,17 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 	//~ if (wait_event_interruptible(complete_q, readout_state==COMPLETE) )
 		//~ return -ERESTARTSYS; /* got signal: tell the fs layer to handle it */
 	
-	return sprintf(buff, 
-			"buf count %lu \n"
+	return sprintf(buff,
+			"mode %s \n"
+			"mux %s \n"
+			"count %lu \n"
 			"ff %d \n"
 			"bursts %u \n"
-			"state %s\n",
-			 buf.count,
+			"state %s \n"
+			 ,
+			 readout_mode ? "DMA" : "CPU",
+			 mutex_is_locked(&readout_mux)? "locked" : "unlocked",
+			 readout_mode? dma_count() : buf.count,
 			 sstats.fifo_fulls,
 			 sstats.bursts_count,
 			 readout_state_str()

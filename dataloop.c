@@ -48,9 +48,6 @@ static void _dataloop(struct work_struct *work)
 
 	dwork->running = TRUE;
 	
-	
-	
-	
 	do {
 		wcount = STAT_WRCOUNT(ioread32(XLREG_STAT));	
 		sstats.bursts_count += 1;
@@ -66,10 +63,13 @@ static void _dataloop(struct work_struct *work)
 		{
 			*(ptr) = ioread32(XLREG_DATA);
 			
-			/// Continue readout even if the buffer is full
-			/// to not to freeze other parts of DAQ system.
-			if (ptr < lastptr) 
-				ptr++;	
+			if (ptr < lastptr) {
+				ptr++;
+			}
+			else {
+				dwork->started = false;
+				break;
+			}
 		}
 
 		buf->count = (char*) ptr - (char*)buf->vaddr;
@@ -93,7 +93,7 @@ void dataloop_start(void * addr, unsigned max /* buffer length */)
 		PERROR("trying to start readout loop while already running ");
 		return;
 	}
-	PDEBUG("starting fifo readout loop");
+	pr_devel("starting fifo readout loop");
 	
 	dataloop_work->started = TRUE;
 	queue_work(dataloop_wq, (struct work_struct *)dataloop_work);
@@ -105,19 +105,19 @@ unsigned int dataloop_stop(void)
 	unsigned long bytes = 0;
 	
 	if (dataloop_work->running == FALSE) {
-		PWARNING("trying to stop fifo readout loop while not running");
+		pr_warn("trying to stop fifo readout loop while not running");
 		return 0;
 	}
 
 	dataloop_work->started = FALSE;
-	PDEBUG("stopping fifo readout");
+	pr_devel("stopping fifo readout");
 
 	if (dataloop_work->running)
 		if (wait_event_interruptible(pending_q, !dataloop_work->running)) //interrupted
 			return -EBUSY;
 	
 	bytes = dataloop_work->buf->count;
-	PDEBUG("readout bytes: %lu", bytes);
+	pr_info("readout bytes: %lu", bytes);
 	return bytes;
 }
 
@@ -145,7 +145,7 @@ int __init em5_dataloop_init( struct em5_buf * buf)
 	dataloop_work->buf = buf;
 	
 	INIT_WORK(&dataloop_work->work, _dataloop );
-	PDEBUG("dataloop_work init" );
+	pr_devel("dataloop_work init" );
 	
 	return 0;
 }

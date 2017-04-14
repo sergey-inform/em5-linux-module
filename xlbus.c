@@ -189,7 +189,7 @@ int __init em5_xlbus_init()
 		return -ENOMEM;
 	}
 	
-	PDEBUG("xlbase ioremapped %lx->%lx", xlbase_hw, xlbase);
+	pr_devel("xlbase ioremapped %lx->%lx", xlbase_hw, xlbase);
 	
 	#ifdef PXA_MSC_CONFIG
 	if ( !request_mem_region( PXA_MSC_BASE, PXA_MSC_LEN, MODULE_NAME) ) {
@@ -205,7 +205,7 @@ int __init em5_xlbus_init()
 		return -ENOMEM;
 	}
 	
-	PDEBUG("pxa-msc conrol registers ioremapped %lx->%lx", mscbase, mscbase);
+	pr_devel("pxa-msc conrol registers ioremapped %lx->%lx", mscbase, mscbase);
 	#endif
 	
 	return 0;

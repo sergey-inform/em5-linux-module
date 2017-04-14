@@ -45,28 +45,23 @@ static void dma_irq_handler( int channel, void *data)
 }
 
 u32 _dma_calculate_count(void)
+/** Calculate DMA progress */
 {
 	int i;
 	unsigned count = 0;
 	dma_addr_t dtadr = DTADR(dma_chan);
+	dma_addr_t dtadr_round = dtadr & (PAGE_SIZE-1);
 	
-	u32 page_count;
-	u32 byte_count;
-	u32 ddadr = DDADR(dma_chan);
-	u32 dinit = transfer.hw_desc_list;
-	
-	// method 1
-	for (i=0; i< transfer.desc_count; i++) {
-		if (transfer.desc_list[i].dtadr == (dtadr & PAGE_MASK) ) { /// if target address in descritpor list
+	for (i=0; i < transfer.desc_count; i++) {
+		if (dtadr_round == transfer.desc_list[i].dtadr) {
 			count = i * PAGE_SIZE + (dtadr & (PAGE_SIZE-1)); /// complete pages + offset
+			break;
 		}
 	}
 	
-	// method 2
-	page_count = (ddadr - dinit) / sizeof(*transfer.desc_list);
-	byte_count = page_count * PAGE_SIZE - (DCMD(dma_chan) & DCMD_LENGTH);
-	
-	pr_info("dtadr: %X,  cnt: %d, cnt_old_method: %d\n",dtadr,  count, byte_count);
+	if (i == transfer.desc_count){  /// overflow
+		count = transfer.desc_count * PAGE_SIZE;
+	}
 	
 	return count;  // bytes
 }
@@ -101,16 +96,16 @@ void _dma_restart(void)
 
 void dma_start(void)
 {
-	//~ _dma_restart();
+	_dma_restart();
 	DDADR(dma_chan) = transfer.hw_desc_list;
 	wmb();
-	
-	pr_devel("dma_start: DCSR %X", DCSR(dma_chan));
 	
 	if(dma_chan!=-1) {
 		DCSR(dma_chan) |= DCSR_RUN;
 		wmb();
 	}
+	
+	pr_devel("dma_start: DCSR %X", DCSR(dma_chan));
 	
 	xlbus_dreq_ena(true);   /// Enable dreqs
 }
@@ -257,10 +252,9 @@ int em5_dma_init( struct em5_buf * buf)
 		transfer.desc_list[i].dcmd  = dcmd | PAGE_SIZE;
 	}
 	
+	//~ pr_devel("last page hwaddr: %X", transfer.desc_list[i-1].dtadr);
+	
 	transfer.desc_list[num_pages - 1].ddadr = DDADR_STOP;
-	/// Instead of STOP, loop readout to the last page (to not to freeze entire DAQ if overflow)
-	/// desc_list[last].ddadr = desc_list[last-1].ddadr  // --> (loop)
-	//~ transfer.desc_list[num_pages - 1].ddadr = transfer.desc_list[num_pages - 2].ddadr;
 	
 	DCSR(dma_chan) &= ~DCSR_RUN;  /// stop channel
 	wmb();
@@ -269,7 +263,8 @@ int em5_dma_init( struct em5_buf * buf)
 	wmb();
 	
 	PDEVEL("DMA src addr: %x.", transfer.hw_addr);
-	PDEVEL("DMA dest addr: %x.", transfer.hw_desc_list);
+	PDEVEL("DMA desc addr: %x.", transfer.hw_desc_list);
+	PDEVEL("DMA target addr: %x.", transfer.desc_list[0].dtadr);
 	
 	return 0;
 }

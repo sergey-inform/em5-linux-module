@@ -36,7 +36,6 @@ static loff_t em5_fop_llseek (struct file * fd, loff_t offset, int whence)
 {
 	long long newpos;
 	
-	PDEVEL("llseek %d", whence);
 	switch(whence)
 	{
 	case SEEK_SET:
@@ -168,7 +167,7 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 {
 	struct em5_fopen_data * fildata; 
 	
-	PDEVEL("open()");
+	pr_devel("open()");
 	
 	if (filp->f_flags & O_NONBLOCK)
 		return -EAGAIN;
@@ -192,7 +191,7 @@ static int em5_fop_fasync(int fd, struct file *filp, int mode)
 /** For async readers (LDD3, chapter 6).
  */
 {
-	PDEVEL("fasync");
+	pr_devel("fasync");
 	return fasync_helper(fd, filp, mode, &async_queue);
 }
 
@@ -298,7 +297,7 @@ int em5_charfile_init (int major, int minor)
 	if (!major) {
 		/// get dynamic major
 		ret = alloc_chrdev_region(&c_devno, minor, 1, MODULE_NAME);
-		PDEBUG( "chardev got major %d.", MAJOR(c_devno));
+		pr_debug( "chardev got major %d.", MAJOR(c_devno));
 	} else {
 		c_devno = MKDEV(major, minor);
 		ret = register_chrdev_region( c_devno, 1, MODULE_NAME);
