@@ -16,10 +16,10 @@
 #include "xlbus.h"
 #include "xlregs.h"
 
-
 ulong xlbase = 0;
 ulong xlbase_hw = 0;
-#define gpio_nRST	36
+
+#define gpio_nRST  36  // GPIO36, SODIMM 127, Xilinx nReset
 
 
 #ifdef PXA_MSC_CONFIG
@@ -32,7 +32,6 @@ ulong mscbase_hw = 0;
 #endif
 
 #define SET_BITS(p, bits, val) ( (val) ? (p)|(bits) : (p) & ~(bits))
-
 
 //~ int xlbus_do(em5_cmd cmd, void* kaddr, size_t sz) {
 	//~ 
@@ -55,7 +54,6 @@ void xlbus_reset() {
 	gpio_set_value(gpio_nRST, 0);
 	udelay(1);
 	gpio_set_value(gpio_nRST, 1);
-	return;
 }
 
 
@@ -208,6 +206,18 @@ int __init em5_xlbus_init()
 	pr_devel("pxa-msc conrol registers ioremapped %lx->%lx", mscbase, mscbase);
 	#endif
 	
+	
+	/// GIPO for reset
+	if (gpio_request(gpio_nRST, "MISS-RST")) {
+		pr_err("Requesting nRST GPIO failed!\n");
+		return -ENODEV;
+	}
+	
+	if (gpio_direction_output(gpio_nRST, 1)) {
+		pr_err("Setting nRST GPIO direction failed!\n");
+		return -EINVAL;
+	}
+	
 	return 0;
 }
 
@@ -230,6 +240,8 @@ void em5_xlbus_free()
 		release_mem_region(mscbase_hw, PXA_MSC_LEN);
 	}
 	#endif
+	
+	gpio_free(gpio_nRST);
 
 	return;
 }

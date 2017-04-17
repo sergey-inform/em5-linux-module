@@ -37,6 +37,7 @@ unsigned int spill_id = 0;  /* global spill number */
 volatile READOUT_STATE readout_state = INIT;
 
 extern bool param_dma_readout;
+extern bool param_reset_on_bs;
 extern ulong xlbase; /** note: here we use it as dev_id (a cookie for callbacks)
 			since this address belongs to our driver. */
 
@@ -130,6 +131,7 @@ void readout_start(void)
  */
 {
 	int i;
+	u32 ctrl;
 	
 	if (mutex_trylock(&readout_mux) == 0){  // 0 -- failed, 1 -- locked
 		PDEVEL("Failed to lock readout_mux");
@@ -146,6 +148,14 @@ void readout_start(void)
 	/// clear buffer contents (to assist debugging)
 	for (i = 0; i < buf.size/sizeof(u32); i++) {
 		((u32*)buf.vaddr)[i] = 0x0;
+	}
+	
+	/// reset euromiss
+	if (param_reset_on_bs) {
+		ctrl = ioread32(XLREG_CTRL);  /// Save control register value
+		rmb();
+		xlbus_reset();
+		iowrite32( ctrl, XLREG_CTRL);  /// Restore control register value
 	}
 	
 	if (param_dma_readout) {

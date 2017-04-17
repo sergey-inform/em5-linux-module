@@ -1,6 +1,9 @@
 #define XLBASE  	0x0C000000L
 #define XLBASE_LEN	0x10000
 
+
+#define SYSPERIF 0x40000000L // reg.addr. of system periferals (AIC,PIO,...) 
+
 extern ulong xlbase; // it's ioremapped in em5_xlbus_init
 extern ulong xlbase_hw; 
 
