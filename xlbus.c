@@ -52,10 +52,9 @@ ulong mscbase_hw = 0;
 
 void xlbus_reset() {
 	gpio_set_value(gpio_nRST, 0);
-	udelay(1);
 	gpio_set_value(gpio_nRST, 1);
+	udelay(1);
 }
-
 
 xlbus_counts xlbus_counts_get(void)
 /** Get EM5 counters */
