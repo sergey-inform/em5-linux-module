@@ -2,6 +2,7 @@ int em5_readout_init( void);
 void em5_readout_free( void);
 void readout_start( void);
 int readout_stop( void);
+unsigned long readout_count( void);
 const char * readout_state_str( void);
 
 typedef enum {

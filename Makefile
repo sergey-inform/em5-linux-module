@@ -1,5 +1,5 @@
 # Comment/uncomment the following line to enable/disable debugging
-DEBUG = y
+#DEBUG = y
 DMA_READOUT = y
 
 INSTALLDIR1 :=/home/user/em5_rootfs_overlay/opt/
@@ -51,7 +51,7 @@ endif
 
 install: $(TARGET).ko
 	#scp -P 2223 $(TARGET).ko root@10.0.2.2:/root/ 
-	scp $(TARGET).ko root@172.22.1.2:/root/ 
+	scp $(TARGET).ko root@172.22.1.3:/opt/ 
 #	install -d $(INSTALLDIR1)
 #	install -d $(INSTALLDIR2)
 #	install -c $(TARGET).ko $(INSTALLDIR1)

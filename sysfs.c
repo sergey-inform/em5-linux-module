@@ -45,19 +45,26 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 	//~ if (wait_event_interruptible(complete_q, readout_state==COMPLETE) )
 		//~ return -ERESTARTSYS; /* got signal: tell the fs layer to handle it */
 	
+	xlbus_counts counts = xlbus_counts_get();
+	
 	return sprintf(buff,
 			"mode %s \n"
-			"mux %s \n"
-			"count %lu \n"
+			"readout mux  %s \n"
+			"buf bytes %lu \n"
+			"readout trailing bytes %u \n"
 			"ff %d \n"
-			"bursts %u \n"
+			"cpu bursts (CPU mode) %u \n"
+			"counts spills %d  events %d \n"
 			"state %s \n"
 			 ,
 			 readout_mode ? "DMA" : "CPU",
 			 mutex_is_locked(&readout_mux)? "locked" : "unlocked",
-			 readout_mode? dma_count() : buf.count,
+			 readout_count(),
+			 sstats.bytes_trailing,
 			 sstats.fifo_fulls,
 			 sstats.bursts_count,
+			 counts.spills,
+			 counts.events,
 			 readout_state_str()
 			 );
 }

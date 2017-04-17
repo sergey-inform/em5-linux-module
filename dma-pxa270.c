@@ -44,23 +44,25 @@ static void dma_irq_handler( int channel, void *data)
 	
 }
 
-u32 _dma_calculate_count(void)
+unsigned _dma_calculate_count(void)
 /** Calculate DMA progress */
 {
 	int i;
 	unsigned count = 0;
 	dma_addr_t dtadr = DTADR(dma_chan);
-	dma_addr_t dtadr_round = dtadr & (PAGE_SIZE-1);
+	dma_addr_t dtadr_round = dtadr & PAGE_MASK;
 	
 	for (i=0; i < transfer.desc_count; i++) {
 		if (dtadr_round == transfer.desc_list[i].dtadr) {
-			count = i * PAGE_SIZE + (dtadr & (PAGE_SIZE-1)); /// complete pages + offset
+			count = i * PAGE_SIZE;  /// complete pages
+			count += (dtadr & (PAGE_SIZE-1));  /// + offset
 			break;
 		}
 	}
-	
+
 	if (i == transfer.desc_count){  /// overflow
 		count = transfer.desc_count * PAGE_SIZE;
+		pr_devel("overflow");
 	}
 	
 	return count;  // bytes
@@ -130,7 +132,7 @@ unsigned long dma_stop(void)
 	dreqs = 0x3f & DRQSR2;
 
 	if (dreqs)
-		pr_debug("non-handled dreqs!!!: %d", dreqs);
+		pr_warn("non-handled dreqs!!!: %d", dreqs);
 	
 	pr_devel("after stop: DDADR %X, DTADR:%X, DCSR %X", DDADR(dma_chan), DTADR(dma_chan), DCSR(dma_chan));
 	

@@ -48,6 +48,20 @@ const char * readout_state_str( void) {
 	return readout_state_strings[readout_state];
 }
 
+unsigned long readout_count(void)
+/** return finished bytes */
+{
+	unsigned long count = 0;
+	
+	if (readout_mode == DMA)
+		count = dma_count();
+	else if (readout_mode == CPU)	
+		count = buf.count;
+	
+	return count;
+}
+
+
 DEFINE_MUTEX(readout_mux);
 
 DECLARE_WAIT_QUEUE_HEAD(dataready_q);  // waiting for new data
@@ -62,7 +76,7 @@ void _do_work_bs(struct work_struct *work)
 
 void _do_work_es(struct work_struct *work)
 {
-	PDEVEL("ES!");
+	PDEVEL("ES! ---");
 	readout_stop();
 }
 
@@ -75,24 +89,26 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	flags = ioread32(XLREG_IFR);
 	
 	if (flags & IFR_BS) {
-		switch(readout_state) {
-			case INIT:
-			case COMPLETE:
-			case OVERFLOW:
-				queue_work( irq_wq, (struct work_struct *)&work_bs );
-				break;
-			default:
-				sstats.unexpected_bs_irq += 1;
-				break;
+		switch(readout_state)
+		{
+		case RUNNING:
+		case PENDING:
+			sstats.unexpected_bs_irq += 1;
+			break;
+			
+		default:
+			queue_work( irq_wq, (struct work_struct *)&work_bs );
+			break;
 		}
 	}
 	if (flags & IFR_ES) {
-		switch(readout_state) {
-			case RUNNING:
-				queue_work( irq_wq, (struct work_struct *)&work_es );
-			default:
-				sstats.unexpected_es_irq += 1;
-				break;
+		switch(readout_state)
+		{
+		case RUNNING:
+			queue_work( irq_wq, (struct work_struct *)&work_es );
+		default:
+			sstats.unexpected_es_irq += 1;
+			break;
 		}
 	}
 	
@@ -113,6 +129,8 @@ void readout_start(void)
 /** Begin FIFO readout.
  */
 {
+	int i;
+	
 	if (mutex_trylock(&readout_mux) == 0){  // 0 -- failed, 1 -- locked
 		PDEVEL("Failed to lock readout_mux");
         return;
@@ -124,6 +142,11 @@ void readout_start(void)
 	
 	kill_readers();  /// send signal to active readers
 	buf.count = 0;  /// reset buffer
+	
+	/// clear buffer contents (to assist debugging)
+	for (i = 0; i < buf.size/sizeof(u32); i++) {
+		((u32*)buf.vaddr)[i] = 0x0;
+	}
 	
 	if (param_dma_readout) {
 		readout_mode = DMA;
@@ -144,6 +167,7 @@ int readout_stop(void)  /// can sleep
  */
 {
 	unsigned long cnt = 0;
+	unsigned long cnt_trailing = 0;
 	u32 * ptr;
 	
 	xlbus_trig_ena(FALSE);  /// Disable trigger intput.
@@ -158,10 +182,13 @@ int readout_stop(void)  /// can sleep
 	/// Finish readout
 	ptr = (u32*)((char*)buf.vaddr + cnt);
 	
-	cnt += 4 * xlbus_fifo_read(ptr, (buf.size - cnt)/sizeof(u32) );  /// read trailing fifo contents
-	xlbus_fifo_flush();  /// flush the rest of fifo if no more space in buf
+	cnt_trailing = xlbus_fifo_read(ptr, (buf.size - cnt)/sizeof(u32) );  /// read trailing fifo contents
+	cnt += cnt_trailing;
 	
+	sstats.bytes_trailing = cnt_trailing;
 	buf.count = cnt; 
+	
+	xlbus_fifo_flush();  /// flush the rest of fifo (if any)
 	
 	if (sstats.unexpected_bs_irq)
 		PWARNING("BS irq unexpected: %d ", sstats.unexpected_bs_irq);
