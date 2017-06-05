@@ -4,12 +4,14 @@
 
 #include <linux/dma-mapping.h>
 #include <linux/device.h>
+#include <linux/interrupt.h>
 #include <linux/wait.h> /*wait..interruptable*/
 
 #include "module.h"
 #include "dma.h"
 #include "xlregs.h"
 #include "xlbus.h"
+#include "readout.h"
 
 #include <linux/version.h>
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 28)
@@ -26,8 +28,12 @@
 int dma_chan = -1; /* auto assing */
 struct device * dev = NULL; // We don't use Centralized Driver Model, so just set it to null.
  
-extern struct em5_buf buf;
+extern struct spill_stats sstats; //DELME
 
+void _do_dataready(unsigned long);
+DECLARE_TASKLET(do_dataready_tasklet, _do_dataready, 0);
+
+unsigned _dma_calculate_count(void);
 
 struct dma_transfer {
 	struct pxa_dma_desc * desc_list; /* a list of dma descriptors for Descriptor-Fetch Transfer */
@@ -35,12 +41,24 @@ struct dma_transfer {
 	size_t desc_len;
 	dma_addr_t hw_desc_list; /* phys address of descriptor chain head */
 	dma_addr_t hw_addr; /* phys address of data source */
-	
 } transfer;
 
 
-static void dma_irq_handler( int channel, void *data)
+void _do_dataready (unsigned long unused)
 {
+	readout_dataready();
+}
+
+static void _dma_irq_handler( int channel, void *data)
+{
+	unsigned int flags = DCSR(channel) & 0b1111;
+	DCSR(channel) |= flags; // clear all interrupt bits
+	
+	if (flags & DCSR_ENDINTR) {
+		sstats.dma_irq_cnt += 1;   //FIXME: will brake if irq after moudle unloaded, *data -> *dev
+	}
+	
+    tasklet_schedule(&do_dataready_tasklet);
 }
 
 
@@ -83,8 +101,8 @@ void _dma_restart(void)
 	dummy_desc->dsadr = transfer.hw_desc_list;
 	dummy_desc->dtadr = transfer.desc_list[0].dtadr;
 	dummy_desc->ddadr = DDADR_STOP;
-	dummy_desc->dcmd  = DCMD_INCSRCADDR| DCMD_INCTRGADDR | /*DCMD_LENGTH =*/ 1;
-	
+	dummy_desc->dcmd  = DCMD_INCSRCADDR| DCMD_INCTRGADDR | /*DCMD_LENGTH =*/ 1 ;
+
 	DDADR(dma_chan) = hw_dummy_desc;
 	wmb();
 	if(dma_chan!=-1)
@@ -167,7 +185,7 @@ int em5_dma_init( struct em5_buf * buf)
 	
 	/// Get dma channel
 	dma_chan = pxa_request_dma( MODULE_NAME, DMA_PRIO_HIGH,
-		       	dma_irq_handler, NULL /* void* data */);
+		       	_dma_irq_handler, NULL /* void* data */);  //TODO data -> dev
 	if (dma_chan < 0) {
 		pr_err("Can't get DMA with PRIO_HIGH.");
 		return -EBUSY;
@@ -188,7 +206,8 @@ int em5_dma_init( struct em5_buf * buf)
 	
 	transfer.hw_addr = XLREG_DATA_HW;
 	dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
-	dcmd |=  DCMD_WIDTH4 | DCMD_BURST32;
+	dcmd |= DCMD_WIDTH4 | DCMD_BURST32;
+	dcmd |= DCMD_ENDIRQEN;  //TODO: IRQ for every N pages
 	
 	/* build descriptor list */
 	for (i = 0; i < (num_pages); i++) {

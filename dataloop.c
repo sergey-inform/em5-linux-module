@@ -8,7 +8,6 @@
 
 #include <linux/delay.h>
 #include <asm/io.h>	/* ioread, iowrite */
-#include <linux/jiffies.h>
 
 #include "module.h"
 #include "em5.h"
@@ -36,16 +35,14 @@ static void _dataloop(struct work_struct *work)
 /** Readout XLREG_DATA FIFO with CPU.
  */
 {
-#define JDIFF (HZ / 1000)    // ms
-
 	unsigned wcount;	// words in FIFO
 	dataloop_work_t * dwork = (dataloop_work_t *) work;
 	struct em5_buf * buf = dwork->buf;
+	
 	u32 * ptr = (u32*)buf->vaddr;
 	u32 * lastptr = ptr + (buf->size / sizeof(u32)) - 1;  // the last word in buf
 	unsigned wfifo_high = WRCOUNT_MASK - WRCOUNT_MASK / 16;  // FIFO full on 94%
-	unsigned long jnext = 0;  // next time (in jiffies) to notify readers
-
+	
 	dwork->running = TRUE;
 	
 	do {
@@ -63,19 +60,14 @@ static void _dataloop(struct work_struct *work)
 			if (ptr < lastptr) {
 				ptr++;
 			}
-			else {
-				dwork->started = false;
+			else {  // no space in buffer
+				dwork->started = false;  
 				break;
 			}
 		}
 
 		buf->count = (char*) ptr - (char*)buf->vaddr;
-		
-		/// throttle reader notifications
-		if (jiffies > jnext) {  // it's time to notify readers
-			notify_readers();
-			jnext = jiffies + JDIFF;
-		}
+		notify_readers();
 		
 	} while (dwork->started);
 	

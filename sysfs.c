@@ -50,21 +50,22 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 	return sprintf(buff,
 			"mode %s \n"
 			"readout mux  %s \n"
-			"buf bytes %lu \n"
+			"buf count %lu \n"
 			"readout trailing bytes %u \n"
 			"ff %d \n"
 			"cpu bursts (CPU mode) %u \n"
+			"counts dma irqs %d \n"
 			"counts spills %d  events %d \n"
 			"state %s \n"
 			 ,
 			 readout_mode ? "DMA" : "CPU",
 			 mutex_is_locked(&readout_mux)? "locked" : "unlocked",
-			 readout_count(),
+			 buf.count,
 			 sstats.bytes_trailing,
 			 sstats.fifo_fulls,
 			 sstats.bursts_count,
-			 counts.spills,
-			 counts.events,
+			 sstats.dma_irq_cnt,
+			 counts.spills, counts.events,
 			 readout_state_str()
 			 );
 }

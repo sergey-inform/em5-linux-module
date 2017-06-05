@@ -23,9 +23,11 @@ static struct cdev * c_dev = {0};
 struct pid * pid_reader = NULL; //TODO: make a list of readers
 struct fasync_struct * async_queue = NULL; /* asynchronous readers */
 
+DECLARE_WAIT_QUEUE_HEAD(dataready_q);  // processes waiting for new data
+
 extern volatile READOUT_STATE readout_state;
 extern struct em5_buf buf;
-extern wait_queue_head_t dataready_q, start_q, stop_q;
+extern wait_queue_head_t start_q, stop_q;
 extern unsigned int spill_id;
 
 struct em5_fopen_data {

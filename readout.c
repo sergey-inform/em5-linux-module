@@ -64,10 +64,30 @@ unsigned long readout_count(void)
 }
 
 
+void readout_dataready(void)
+/** Wake up buffer readers if new data has come. */
+{
+	/// throttle reader notifications
+	
+	#define JDIFF (HZ / 10) // 100 ms  
+	
+	static unsigned long jnext = 0;  // next time (in jiffies) to notify readers
+	
+	if (jiffies < jnext) // not to be annoying
+		return;
+	
+	jnext = jiffies + JDIFF;
+	
+	buf.count = readout_count();
+	notify_readers();
+	
+	// stop readout if no space in buffer??
+	
+}
+
 
 DEFINE_MUTEX(readout_mux);
 
-DECLARE_WAIT_QUEUE_HEAD(dataready_q);  // waiting for new data
 DECLARE_WAIT_QUEUE_HEAD(start_q);  // waiting for readout start
 DECLARE_WAIT_QUEUE_HEAD(stop_q);  // waiting for readout completion
 
@@ -210,6 +230,7 @@ int readout_stop(void)  /// can sleep
 	
 	if (xlbus_is_error())
 		readout_state = ERROR;
+		
 	else if (buf.count >= buf.size)
 		readout_state = OVERFLOW;
 	else 
