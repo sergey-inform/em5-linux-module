@@ -56,11 +56,13 @@ unsigned long readout_count(void)
 	
 	if (readout_mode == DMA)
 		count = dma_count();
+		
 	else if (readout_mode == CPU)	
-		count = buf.count;
+		count = dataloop_count();
 	
 	return count;
 }
+
 
 
 DEFINE_MUTEX(readout_mux);

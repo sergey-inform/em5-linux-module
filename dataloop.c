@@ -56,9 +56,6 @@ static void _dataloop(struct work_struct *work)
 			sstats.fifo_fulls += 1;
 		}
 		
-		// if count > wfifo_high
-		// 		sstats.fifo_fulls += 1;
-		
 		while (wcount--)
 		{
 			*(ptr) = ioread32(XLREG_DATA);

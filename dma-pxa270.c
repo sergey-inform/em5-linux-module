@@ -38,11 +38,11 @@ struct dma_transfer {
 	
 } transfer;
 
+
 static void dma_irq_handler( int channel, void *data)
 {
-	
-	
 }
+
 
 unsigned _dma_calculate_count(void)
 /** Calculate DMA progress */
@@ -62,11 +62,12 @@ unsigned _dma_calculate_count(void)
 
 	if (i == transfer.desc_count){  /// overflow
 		count = transfer.desc_count * PAGE_SIZE;
-		pr_devel("overflow");
+		pr_devel("dma_count buffer overflow");
 	}
 	
 	return count;  // bytes
 }
+
 
 void _dma_restart(void) 
 {
@@ -96,6 +97,7 @@ void _dma_restart(void)
 #define DRQSR2 DMAC_REG(0xE8) /*DREQ2 Status Register*/
 #define DRQSR_CLR (1<<8)
 
+
 void dma_start(void)
 {
 	_dma_restart();
@@ -111,6 +113,7 @@ void dma_start(void)
 	
 	xlbus_dreq_ena(true);   /// Enable dreqs
 }
+
 
 unsigned long dma_stop(void)
 /* Returns a number of written bytes. */
@@ -155,63 +158,6 @@ unsigned long dma_stop(void)
 unsigned dma_count(void) {
 	return _dma_calculate_count();
 }
-
-
-//em5_readout_finish(void)
-//~ int i;
-	//~ int overrun = 0;
-	//~ unsigned int wtrailing = 0 ;
-	//~ unsigned int bcount;
-	//~ bcount = 0;
-	//~ 
-	//~ bcount = em5_dma_stop();
-	//~ pr_devel("bcount: %d", bcount);
-	//~ 
-	//~ iowrite32( ctrl & ~TRIG_ENA, XLREG_CTRL); //disable triggers
-	//~ 
-	//~ //TODO: check dma errors
-	//~ 
-	//~ /*read trailing bytes*/
-	//~ while (( wtrailing = STAT_WRCOUNT(ioread32(XLREG_STAT)) )) //leftover in FIFO
-	//~ {
-		//~ if (wtrailing * EMWORD_SZ + bcount > buf.size ) { //overrun?
-			//~ wtrailing = (buf.size - bcount) / EMWORD_SZ; //prevent overflow
-			//~ em5_current_state |= EM5_STATE_OVERRUN;
-			//~ overrun = 1;
-		//~ }
-		//~ 
-		//~ if (wtrailing > 8) { //a burst size in words
-			//~ pr_err("%d trailing words in FIFO (more than a DMA burst size)!!!", wtrailing);
-			//~ 
-			//~ if (!overrun) {
-				//~ //some sort of DMA error? DMA not working?
-				//~ em5_current_state |= EM5_STATE_ERROR;
-				//~ return -1;
-			//~ }
-		//~ }
-		//~ 
-		//~ if (overrun) {
-			//~ break;
-		//~ }
-		//~ 
-		//~ for (i=0; i<wtrailing; i++){
-			//~ ((u32 *)buf.vaddr)[bcount/EMWORD_SZ + i] = ioread32(XLREG_DATA);
-		//~ }
-		//~ 
-		//~ bcount += wtrailing * EMWORD_SZ;
-	//~ }
-	//~ 
-	//~ buf.count = bcount;
-	//~ pr_info("buf count: %lu\n",  buf.count );
-	//~ 
-	//~ em5_current_state &= ~EM5_STATE_BUSY;
-	//~ //enable xlbus operations
-	//~ 
-	//~ em5_current_state |= EM5_STATE_DREADY;
-	//~ 
-	//~ pr_info("wake_up_interruptible - ok");
-	//~ return 0;
-
 
 int em5_dma_init( struct em5_buf * buf)
 {
@@ -270,7 +216,6 @@ int em5_dma_init( struct em5_buf * buf)
 	
 	return 0;
 }
-
 
 
 void em5_dma_free( void)
