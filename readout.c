@@ -102,10 +102,6 @@ void _do_work_bs(struct work_struct *work)
 void _do_work_es(struct work_struct *work)
 {
 	PDEVEL("ES! ---");
-	if (param_set_busy) {
-		xlbus_busy(1);
-	}
-	xlbus_trig_ena(FALSE);  /// Disable trigger intput.
 	readout_stop();
 }
 
@@ -134,6 +130,11 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 		switch(readout_state)
 		{
 		case RUNNING:
+			if (param_set_busy) {
+				xlbus_busy(1);
+			}
+			mb();
+			xlbus_trig_ena(FALSE);  /// Disable trigger intput.
 			queue_work( irq_wq, (struct work_struct *)&work_es );
 		default:
 			sstats.unexpected_es_irq += 1;
@@ -198,6 +199,7 @@ void readout_start(void)
 	if (param_set_busy) {
 		xlbus_busy(0);  ///unset busy
 	}
+	mb();
 	xlbus_trig_ena(TRUE);  ///enable trigger input
 	wake_up_interruptible(&start_q);  /// wake up processes waiting for data
 }
