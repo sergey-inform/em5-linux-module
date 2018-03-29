@@ -41,6 +41,10 @@ bool param_reset_on_bs = true; // can be changed in runtime
 module_param_named( reset, param_reset_on_bs, bool, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC( dma, "reset miss on every new spill.");
 
+bool param_set_busy = false; // can be changed in runtime
+module_param_named( busy, param_set_busy, bool, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC( busy, "set busy when spill ends.");
+
 struct em5_buf buf = {};
 
 static void em5_cleanup(void)

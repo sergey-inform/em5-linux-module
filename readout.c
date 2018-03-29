@@ -38,6 +38,8 @@ volatile READOUT_STATE readout_state = INIT;
 
 extern bool param_dma_readout;
 extern bool param_reset_on_bs;
+extern bool param_set_busy;
+
 extern ulong xlbase; /** note: here we use it as dev_id (a cookie for callbacks)
 			since this address belongs to our driver. */
 
@@ -100,6 +102,10 @@ void _do_work_bs(struct work_struct *work)
 void _do_work_es(struct work_struct *work)
 {
 	PDEVEL("ES! ---");
+	if (param_set_busy) {
+		xlbus_busy(1);
+	}
+	xlbus_trig_ena(FALSE);  /// Disable trigger intput.
 	readout_stop();
 }
 
@@ -160,7 +166,7 @@ void readout_start(void)
         return;
 	}
         
-    memset(&sstats, 0, sizeof(sstats)); /// flush spill statistics
+	memset(&sstats, 0, sizeof(sstats)); /// flush spill statistics
 	spill_id += 1;
 	readout_state = RUNNING;
 	
@@ -189,6 +195,9 @@ void readout_start(void)
 		dataloop_start(buf.vaddr, buf.size);
 	}
 	
+	if (param_set_busy) {
+		xlbus_busy(0);  ///unset busy
+	}
 	xlbus_trig_ena(TRUE);  ///enable trigger input
 	wake_up_interruptible(&start_q);  /// wake up processes waiting for data
 }
@@ -202,7 +211,6 @@ int readout_stop(void)  /// can sleep
 	unsigned long cnt_trailing = 0;
 	u32 * ptr;
 	
-	xlbus_trig_ena(FALSE);  /// Disable trigger intput.
 	
 	readout_state = PENDING;
 	switch (readout_mode)
