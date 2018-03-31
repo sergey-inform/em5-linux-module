@@ -101,11 +101,26 @@ void xlbus_irq_ena(bool val) {
 }
 
 #define SET_BITS(p, bits, val) ( (val) ? (p)|(bits) : (p) & ~(bits))
+#define TOGGLE_BITS(p, bits) ( (p)^(bits) )
 
 void xlbus_dreq_ena(bool val) {
 /** Enable/disable dma interrupts.
  */
 	iowrite32( SET_BITS( ioread32(XLREG_CTRL), DMA_ENA, val),
+			XLREG_CTRL);
+}
+
+void xlbus_test_ena(bool val) {
+/** Turn On/Off test output.
+ */
+	iowrite32( SET_BITS( ioread32(XLREG_CTRL), TEST_ON, val),
+			XLREG_CTRL);
+}
+
+void xlbus_test_toggle() {
+/** Toggle test output.
+ */
+	iowrite32( TOGGLE_BITS( ioread32(XLREG_CTRL), TEST_ON),
 			XLREG_CTRL);
 }
 

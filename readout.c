@@ -105,6 +105,7 @@ void _do_work_es(struct work_struct *work)
 	readout_stop();
 }
 
+
 irqreturn_t _irq_handler(int irq, void * dev_id)
 /** Interrupt handler.
  * (runs in interrupt context, so no waiting/printing here!)
@@ -133,8 +134,6 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 			if (param_set_busy) {
 				xlbus_busy(1);
 			}
-			mb();
-			xlbus_trig_ena(FALSE);  /// Disable trigger intput.
 			queue_work( irq_wq, (struct work_struct *)&work_es );
 		default:
 			sstats.unexpected_es_irq += 1;
@@ -149,9 +148,11 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	if (flags & IFR_FE) {
 		/* FIFO Empty - broken in hardware.*/
 	}
-	
+
+
 	mb();
 	iowrite32(flags, XLREG_IFR); //clear flags
+	xlbus_test_toggle();
 	return IRQ_HANDLED;
 }
 
@@ -174,11 +175,6 @@ void readout_start(void)
 	kill_readers();  /// send signal to active readers
 	buf.count = 0;  /// reset buffer
 	
-	/// clear buffer contents (to assist debugging)
-	for (i = 0; i < buf.size/sizeof(u32); i++) {
-		((u32*)buf.vaddr)[i] = 0x0;
-	}
-	
 	/// reset euromiss
 	if (param_reset_on_bs) {
 		ctrl = ioread32(XLREG_CTRL);  /// Save control register value
@@ -186,6 +182,9 @@ void readout_start(void)
 		xlbus_reset();
 		iowrite32( ctrl, XLREG_CTRL);  /// Restore control register value
 	}
+
+	/// clear buffer contents (to assist debugging)
+	memset(buf.vaddr, 0, buf.size);
 	
 	if (param_dma_readout) {
 		readout_mode = DMA;
