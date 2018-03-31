@@ -34,7 +34,7 @@ extern struct em5_buf buf;
 enum {CPU, DMA} readout_mode = CPU;  // remember active mode
 unsigned int spill_id = 0;  /* global spill number */
 
-volatile READOUT_STATE readout_state = INIT;
+READOUT_STATE readout_state = INIT;
 
 extern bool param_dma_readout;
 extern bool param_reset_on_bs;
@@ -49,6 +49,49 @@ struct work_struct work_bs, work_es;
 static const char * readout_state_strings[] = {READOUT_STATE_STRINGS};
 const char * readout_state_str( void) {
 	return readout_state_strings[readout_state];
+}
+
+struct irq_log_entry {
+	unsigned long long clock;
+	unsigned int xlbus_ifr_flags;
+	int readout_state;
+};
+
+#define IRQ_LOG_MAX  10  // a number of log entries
+struct irq_log_entry irq_log [IRQ_LOG_MAX];
+int irq_log_count = 0;
+
+
+void print_irq_log(void) 
+{
+	struct irq_log_entry * ent;
+	unsigned int flags;
+	unsigned long long clock = 0;
+	long long int clock_diff;
+	READOUT_STATE state;
+	int i;
+
+	PDEVEL("irq count: %u", irq_log_count);
+
+	for(i = 0; i < irq_log_count; i++) {
+		ent = &irq_log[i];
+
+		clock_diff = clock ? ent->clock - clock: 0;
+		clock = ent->clock;
+		flags = ent->xlbus_ifr_flags;
+		state = (READOUT_STATE) ent->readout_state;
+
+		PDEVEL("irq %d %+12lldns state: %s\t0x%X [%s%s%s%s]"
+			,i
+			,clock_diff
+			,readout_state_strings[state]
+			,flags
+			,flags & IFR_BS ? " BS" : ""
+			,flags & IFR_ES ? " ES" : ""
+			,flags & IFR_FF ? " FF" : ""
+			,flags & IFR_FE ? " FE" : ""
+			);
+	} 
 }
 
 unsigned long readout_count(void)
@@ -95,13 +138,13 @@ DECLARE_WAIT_QUEUE_HEAD(stop_q);  // waiting for readout completion
 
 void _do_work_bs(struct work_struct *work) 
 {
-	PDEVEL("--- BS!");
+	PDEVEL("--- BS! ---");
 	readout_start();
 }
 
 void _do_work_es(struct work_struct *work)
 {
-	PDEVEL("ES! ---");
+	PDEVEL("--- ES! ---");
 	readout_stop();
 }
 
@@ -112,32 +155,34 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
  */
 {
 	unsigned int flags;
+	unsigned long long clock;
+	int is_readout;
+
 	flags = ioread32(XLREG_IFR);
+	clock = sched_clock();
+	is_readout = mutex_is_locked(&readout_mux);
+
 	
 	if (flags & IFR_BS) {
-		switch(readout_state)
-		{
-		case RUNNING:
-		case PENDING:
+
+		if (is_readout) {
 			sstats.unexpected_bs_irq += 1;
-			break;
-			
-		default:
+		}
+		else {
 			queue_work( irq_wq, (struct work_struct *)&work_bs );
-			break;
+			irq_log_count = 0;
+			memset(&irq_log, 0, sizeof(struct irq_log_entry) * IRQ_LOG_MAX);
 		}
 	}
-	if (flags & IFR_ES) {
-		switch(readout_state)
-		{
-		case RUNNING:
-			if (param_set_busy) {
-				xlbus_busy(1);
-			}
+	else if (flags & IFR_ES) {
+
+		if (is_readout) {
 			queue_work( irq_wq, (struct work_struct *)&work_es );
-		default:
+			if (param_set_busy)
+				xlbus_busy(1);
+		}
+		else {
 			sstats.unexpected_es_irq += 1;
-			break;
 		}
 	}
 	
@@ -149,18 +194,25 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 		/* FIFO Empty - broken in hardware.*/
 	}
 
-
+	if (irq_log_count < IRQ_LOG_MAX) {
+		irq_log[irq_log_count] = (struct irq_log_entry) {
+				clock,
+				flags,
+				readout_state};
+		irq_log_count += 1; 
+	}
 	mb();
-	iowrite32(flags, XLREG_IFR); //clear flags
-	xlbus_test_toggle();
+	iowrite32(flags, XLREG_IFR);  //clear flags
+
+	xlbus_test_toggle();  // toggle test output on front panel
 	return IRQ_HANDLED;
 }
+
 
 void readout_start(void)
 /** Begin FIFO readout.
  */
 {
-	int i;
 	u32 ctrl;
 	
 	if (mutex_trylock(&readout_mux) == 0){  // 0 -- failed, 1 -- locked
@@ -237,6 +289,11 @@ int readout_stop(void)  /// can sleep
 	if (sstats.unexpected_es_irq)
 		PWARNING("ES irq unexpected: %d ", sstats.unexpected_es_irq);
 	
+	if (irq_log_count)
+		print_irq_log();
+	else
+		PWARNING("No IRQs?");
+
 	if (xlbus_is_error())
 		readout_state = ERROR;
 		
@@ -250,8 +307,11 @@ int readout_stop(void)  /// can sleep
 	wake_up_interruptible(&stop_q);  /// wake up processes waiting for readout complete
 	
 	mutex_unlock(&readout_mux);
+	
+	PDEVEL("readout: %s", readout_state_str());
 	return 0;
 }
+
 
 
 int em5_readout_init()
