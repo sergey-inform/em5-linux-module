@@ -155,13 +155,13 @@ unsigned long dma_stop(void)
 	if (dreqs)
 		pr_warn("non-handled dreqs!!!: %d", dreqs);
 	
-	pr_devel("after stop: DDADR %X, DTADR:%X, DCSR %X", DDADR(dma_chan), DTADR(dma_chan), DCSR(dma_chan));
+	pr_devel("dma_stop: DDADR %X, DTADR:%X, DCSR %X", DDADR(dma_chan), DTADR(dma_chan), DCSR(dma_chan));
 	
 	
 #define DCSR_STR(flag) (dcsr & DCSR_##flag ? #flag" " : "")	
 	
 	dcsr = DCSR(dma_chan);
-	pr_devel("DCSR  = %08x (%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s)\n",
+	pr_devel("dma_stop: DCSR  = %08x (%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s)\n",
 		dcsr, DCSR_STR(RUN), DCSR_STR(NODESC),
 		DCSR_STR(STOPIRQEN), DCSR_STR(EORIRQEN),
 		DCSR_STR(EORJMPEN), DCSR_STR(EORSTOPEN),
