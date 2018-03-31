@@ -158,6 +158,8 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	unsigned long long clock;
 	int is_readout;
 
+	xlbus_test_toggle();  // toggle test output on front panel
+
 	flags = ioread32(XLREG_IFR);
 	clock = sched_clock();
 	is_readout = mutex_is_locked(&readout_mux);
@@ -204,7 +206,6 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	mb();
 	iowrite32(flags, XLREG_IFR);  //clear flags
 
-	xlbus_test_toggle();  // toggle test output on front panel
 	return IRQ_HANDLED;
 }
 
