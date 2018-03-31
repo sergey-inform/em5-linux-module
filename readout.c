@@ -164,7 +164,6 @@ irqreturn_t _irq_handler(int irq, void * dev_id)
 	clock = sched_clock();
 	is_readout = mutex_is_locked(&readout_mux);
 
-	
 	if (flags & IFR_BS) {
 
 		if (is_readout) {
@@ -312,7 +311,6 @@ int readout_stop(void)  /// can sleep
 	PDEVEL("readout: %s", readout_state_str());
 	return 0;
 }
-
 
 
 int em5_readout_init()

@@ -169,7 +169,7 @@ static int em5_fop_open (struct inode *inode, struct file *filp)
 {
 	struct em5_fopen_data * fildata; 
 	
-	pr_devel("open()");
+	pr_devel("charfile: open()");
 	
 	if (filp->f_flags & O_NONBLOCK)
 		return -EAGAIN;
@@ -193,7 +193,7 @@ static int em5_fop_fasync(int fd, struct file *filp, int mode)
 /** For async readers (LDD3, chapter 6).
  */
 {
-	pr_devel("fasync");
+	pr_devel("charfile: fasync");
 	return fasync_helper(fd, filp, mode, &async_queue);
 }
 
@@ -212,7 +212,7 @@ static int em5_fop_release (struct inode *inode, struct file *filp)
 	pid  = get_task_pid(current, PIDTYPE_PID); 
 	if (pid_reader == pid) {
 		pid_reader = NULL;
-		pr_devel("carfile closed, unset reader PID: %d\n", pid_nr(pid));
+		pr_devel("charfile: closed, unset reader PID: %d\n", pid_nr(pid));
 	}
 	
 	return 0;
